@@ -1,0 +1,38 @@
+# Thông tin xác thực
+.env
+.env.*
+!.env.example
+*.key
+*.p12
+*.pfx
+*.kubeconfig
+kubeconfig
+admin.conf
+super-admin.conf
+.kube/
+.ssh/
+.gcloud/
+credentials*.json
+*service-account*.json
+secrets/
+private/
+.nt132-private/
+*.tfstate
+*.tfstate.*
+.terraform/
+*.tfvars
+!*.tfvars.example
+# Snapshot và bản export có thể chứa Secret
+*.db
+*.snapshot
+*rendered.yaml
+*rendered.yml
+# Công cụ và đầu ra tạm
+node_modules/
+__pycache__/
+*.pyc
+.tmp*/
+tmp/
+*.log
+.DS_Store
+Thumbs.db
