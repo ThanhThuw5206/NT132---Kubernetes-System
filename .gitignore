@@ -36,3 +36,9 @@ tmp/
 *.log
 .DS_Store
 Thumbs.db
+.cache/
+.generated/
+config/application.json
+*.tfplan
+crash.log
+*.backup

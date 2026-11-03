@@ -1,0 +1,18 @@
+hostname: rancher.nt132.test
+replicas: 1
+privateCA: true
+agentTLSMode: strict
+ingress:
+  ingressClassName: rancher-traefik
+  tls:
+    source: secret
+  extraAnnotations:
+    kubernetes.io/ingress.class: rancher-traefik
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+resources:
+  requests:
+    cpu: 250m
+    memory: 768Mi
+  limits:
+    memory: 2Gi

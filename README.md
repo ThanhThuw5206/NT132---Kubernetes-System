@@ -15,17 +15,24 @@
 | src/ | Source mẫu được nhóm lựa chọn, kèm nguồn và giấy phép. TV2. |
 | mesh/istio/ | Cài Istio, gateway, route, mTLS và phân quyền. TV2/TV3. |
 | network/policies/ | Kubernetes NetworkPolicy và ma trận nguồn/đích. TV3. |
-| management/rancher/ | Helm values, ingress và cấu hình DNS công khai của lab. TV1. |
+| management/rancher/ | Helm values, ingress riêng và DNS nội bộ của Rancher. TV1. |
 | observability/ | Prometheus, Kiali và hướng dẫn tạo traffic. TV3. |
 | tests/service/ | Kiểm thử DNS, selector, EndpointSlice và NodePort. Cả nhóm. |
 | tests/security/ | Các ca đối chứng, Istio và NetworkPolicy. Cả nhóm. |
 | scripts/ | Script thao tác có phạm vi rõ ràng và hướng dẫn chạy. |
 | docs/ | Kế hoạch, hướng dẫn, inventory và bằng chứng đã loại thông tin nhạy cảm. |
 
-Đây là cấu trúc khởi tạo. Các thư mục cấu hình và source sẽ được điền bằng tài nguyên đã kiểm tra của nhóm. Hạ tầng hiện chưa được triển khai bởi repository này.
+Repository đã có Terraform tạo ba VM, script bootstrap kubeadm/Calico, Helm values cho Rancher/Istio và script dashboard. Hạ tầng chưa được apply vào project thật. Ứng dụng do TV2 lựa chọn và bổ sung.
+
+**Bắt đầu tại [hướng dẫn triển khai cloud](docs/deploy-cloud.md)**: có từng lệnh chạy tại Cloud Shell, VM và Windows, kiểm tra sau mỗi giai đoạn, lịch năm ngày và cách dọn tài nguyên. Đây là nguồn hướng dẫn thao tác cho bộ config hiện tại; không chạy xen kẽ lệnh tạo hạ tầng trong tài liệu cũ.
+
+Phiên bản được ghim tại `config/versions.env`. Điền project trong `infra/gcp/terraform.tfvars` (không commit), dùng Terraform plan trước apply. Cấu hình mặc định là ba VM 2 vCPU/8 GiB, tổng boot disk 110 GB, truy cập dashboard qua IAP/SSH; public LB tùy chọn. Laptop không cần máy ảo.
+
+Thông số ứng dụng nhập qua `config/application.json` theo file example. `scripts/render-application.py` kiểm tra thông số rồi tạo route và policy riêng cho lần chạy. Không apply cả thư mục kết quả; làm theo thứ tự trong hướng dẫn để kiểm chứng từng lớp.
 
 ## Tài liệu bắt đầu
 
+- [Triển khai cloud từng bước](docs/deploy-cloud.md)
 - [Kế hoạch tổng thể](docs/plan.md)
 - [Hướng dẫn TV1](docs/tv1-setup.md)
 - [Inventory mẫu](docs/inventory.example.md)

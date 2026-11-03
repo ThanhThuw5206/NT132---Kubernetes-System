@@ -1,0 +1,16 @@
+{
+  "namespace": "REPLACE_ME",
+  "entry_service": "REPLACE_ME",
+  "entry_service_port": 8080,
+  "public_path_prefix": "/",
+  "target_service": "REPLACE_ME",
+  "target_service_port": 8080,
+  "target_port": 8080,
+  "target_labels": {"app": "REPLACE_ME"},
+  "allowed_caller_labels": {"app": "REPLACE_ME"},
+  "allowed_service_account": "REPLACE_ME",
+  "trust_domain": "cluster.local",
+  "allowed_http_methods": ["GET"],
+  "allowed_http_paths": ["/REPLACE_ME"],
+  "permit_prometheus_scrape": true
+}

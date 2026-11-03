@@ -1,5 +1,7 @@
 # Hướng dẫn thực hành cho TV1 · Kubernetes trên ba VM Google Cloud
 
+> **Cập nhật bộ config:** Khi triển khai, dùng [deploy-cloud.md](deploy-cloud.md) với Terraform/script hiện tại. Các lệnh thủ công và phiên bản trong tài liệu này là tài liệu tham khảo trước đó; không chạy xen kẽ. Cấu hình hiện tại dùng ba VM 8 GiB RAM, disk 30/40/40 GB và Rancher qua tunnel riêng.
+
 **Thông số ứng dụng do TV2 quyết định.** Xem [phiếu bàn giao](./application-handover.md). APP_NAMESPACE, ENTRY_SERVICE, CALLER_SERVICE, TARGET_SERVICE, SERVICE_PORT và các token viết hoa trong ví dụ cần thay bằng giá trị thực trước khi chạy. Với đường dẫn, /APP_PATH và /TEST_PATH là ký hiệu cả path, thay bằng đường dẫn thật có một dấu / đầu. Các dòng mô tả chức năng của ứng dụng là tiêu chí kiểm thử cần đối chiếu với lựa chọn của TV2.
 
 Ngày biên soạn 03/11/2026. Tài liệu dành cho bạn phụ trách hạ tầng, control plane, Rancher và đường public của đồ án NT132. Cụm dùng ứng dụng do TV2 tự chọn để học Kubernetes Service. Các câu lệnh dưới đây là hướng dẫn để nhóm triển khai; chưa được chạy trên project Google Cloud của nhóm.

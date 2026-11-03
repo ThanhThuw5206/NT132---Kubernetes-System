@@ -1,5 +1,7 @@
 # NT132 · Kế hoạch tổng thể xây dựng và quản trị Kubernetes trên ba VM Google Cloud
 
+> **Hướng dẫn triển khai hiện tại:** [deploy-cloud.md](deploy-cloud.md) mô tả bộ config có thể chạy, lịch năm ngày và phân công. Thông số triển khai lấy từ Terraform và `config/versions.env`; các ví dụ thủ công bên dưới là tham khảo. Chưa apply hạ tầng vào project thật.
+
 **Thông số ứng dụng do TV2 quyết định.** Xem [phiếu bàn giao](./application-handover.md). APP_NAMESPACE, ENTRY_SERVICE, CALLER_SERVICE, TARGET_SERVICE, SERVICE_PORT và các token viết hoa trong ví dụ cần thay bằng giá trị thực trước khi chạy. Với đường dẫn, /APP_PATH và /TEST_PATH là ký hiệu cả path, thay bằng đường dẫn thật có một dấu / đầu. Các dòng mô tả chức năng của ứng dụng là tiêu chí kiểm thử cần đối chiếu với lựa chọn của TV2.
 
 **Đề tài:** Khảo sát Kubernetes Service trên cụm tự dựng gồm ba VM Compute Engine. Nhóm dùng ứng dụng do TV2 tự chọn để kiểm chứng DNS, ClusterIP, selector, EndpointSlice, NodePort và đường vào từ cloud load balancer. Rancher phục vụ quản trị cụm; Istio và Calico giúp kiểm tra quyền truy cập tới cùng một Service. **Nhóm:** ba thành viên. **Lịch dự kiến:** 02–27/11/2026.
