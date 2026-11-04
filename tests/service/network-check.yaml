@@ -3,6 +3,9 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: network-check
+  labels:
+    app.kubernetes.io/managed-by: nt132-net01
+    istio-injection: disabled
 ---
 apiVersion: v1
 kind: Pod
@@ -11,6 +14,7 @@ metadata:
   namespace: network-check
   labels:
     app: network-check-server
+    app.kubernetes.io/managed-by: nt132-net01
 spec:
   nodeSelector:
     kubernetes.io/hostname: wk-01
@@ -35,6 +39,8 @@ kind: Service
 metadata:
   name: server
   namespace: network-check
+  labels:
+    app.kubernetes.io/managed-by: nt132-net01
 spec:
   selector:
     app: network-check-server
@@ -48,9 +54,74 @@ kind: Pod
 metadata:
   name: client
   namespace: network-check
+  labels:
+    app.kubernetes.io/managed-by: nt132-net01
 spec:
   nodeSelector:
     kubernetes.io/hostname: wk-02
+  containers:
+    - name: curl
+      image: curlimages/curl:8.14.1
+      command: ["sh", "-c", "sleep 3600"]
+      resources:
+        requests:
+          cpu: 20m
+          memory: 16Mi
+        limits:
+          memory: 64Mi
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: server-reverse
+  namespace: network-check
+  labels:
+    app: network-check-server-reverse
+    app.kubernetes.io/managed-by: nt132-net01
+spec:
+  nodeSelector:
+    kubernetes.io/hostname: wk-02
+  containers:
+    - name: http
+      image: nginx:1.28.0-alpine
+      ports:
+        - containerPort: 80
+      readinessProbe:
+        httpGet:
+          path: /
+          port: 80
+      resources:
+        requests:
+          cpu: 50m
+          memory: 32Mi
+        limits:
+          memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: server-reverse
+  namespace: network-check
+  labels:
+    app.kubernetes.io/managed-by: nt132-net01
+spec:
+  selector:
+    app: network-check-server-reverse
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: client-reverse
+  namespace: network-check
+  labels:
+    app.kubernetes.io/managed-by: nt132-net01
+spec:
+  nodeSelector:
+    kubernetes.io/hostname: wk-01
   containers:
     - name: curl
       image: curlimages/curl:8.14.1

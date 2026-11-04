@@ -16,5 +16,8 @@ kubectl -n tigera-operator rollout status deploy/tigera-operator --timeout=300s
 echo "Workers must join before the following readiness checks can complete."
 kubectl wait --for=condition=Ready nodes --all --timeout=600s
 kubectl -n kube-system rollout status deploy/coredns --timeout=300s
+kubectl wait --for=condition=Available=True tigerastatus/calico --timeout=300s
+kubectl wait --for=condition=Progressing=False tigerastatus/calico --timeout=300s
+kubectl wait --for=condition=Degraded=False tigerastatus/calico --timeout=300s
 kubectl get nodes -o wide
 kubectl get tigerastatus

@@ -92,6 +92,8 @@ done
 
 Archive không có `.git`, không chứa file chưa commit. Mỗi lần cập nhật phải tạo archive từ commit mới và chuyển lại; không ghi đè các file vận hành riêng mà không kiểm tra. Các bí mật nằm ngoài thư mục source.
 
+**Khi nhận phần TV3:** lấy branch `tv3/istio-network` theo [hướng dẫn bàn giao](tv3-handover.md) trước khi tạo archive, ghi lại `git rev-parse HEAD`. Archive của commit TV3 chứa các file đã commit; archive từ branch TV1 hoặc commit nền `17aaed9` chưa chứa phần bổ sung TV3. Nếu có sửa đổi local mới chưa commit, chuyển thêm overlay theo hướng dẫn và kiểm tra manifest/checksum; `git archive HEAD` luôn bỏ thay đổi chưa commit.
+
 Mở SSH lần lượt vào **cả ba node**, thực hiện trên mỗi node:
 
 ```bash
