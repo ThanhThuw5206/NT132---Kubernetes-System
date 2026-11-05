@@ -1,0 +1,9 @@
+pilot:
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      memory: 1Gi
+meshConfig:
+  accessLogFile: /dev/stdout

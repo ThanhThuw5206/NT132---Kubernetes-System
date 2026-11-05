@@ -1,0 +1,17 @@
+service:
+  type: NodePort
+  externalTrafficPolicy: Cluster
+  ports:
+    - name: status-port
+      port: 15021
+      targetPort: 15021
+    - name: http2
+      port: 80
+      targetPort: 80
+      nodePort: 30080
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    memory: 512Mi

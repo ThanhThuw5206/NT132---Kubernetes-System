@@ -1,8 +1,12 @@
 # Hướng dẫn thực hành cho TV1 · Kubernetes trên ba VM Google Cloud
 
-Ngày biên soạn 03/11/2026. Tài liệu dành cho bạn phụ trách hạ tầng, control plane, Rancher và đường public của đồ án NT132. Cụm dùng Bookinfo có sẵn để học Kubernetes Service. Các câu lệnh dưới đây là hướng dẫn để nhóm triển khai; chưa được chạy trên project Google Cloud của nhóm.
+> **Cập nhật bộ config:** Khi triển khai, dùng [deploy-cloud.md](deploy-cloud.md) với Terraform/script hiện tại. Các lệnh thủ công và phiên bản trong tài liệu này là tài liệu tham khảo trước đó; không chạy xen kẽ. Cấu hình hiện tại dùng ba VM 8 GiB RAM, disk 30/40/40 GB và Rancher qua tunnel riêng.
 
-**Kết quả bạn cần bàn giao.** Ba VM gia nhập cùng một cụm; hai worker chạy được Pod liên lạc với nhau; bạn mở Rancher từ laptop để chỉ node, workload và Service; người ngoài VPC mở được Bookinfo qua IP của load balancer; bạn tự phân biệt được lỗi đường mạng, Service không có endpoint và policy từ chối.
+**Thông số ứng dụng do TV2 quyết định.** Xem [phiếu bàn giao](./application-handover.md). APP_NAMESPACE, ENTRY_SERVICE, CALLER_SERVICE, TARGET_SERVICE, SERVICE_PORT và các token viết hoa trong ví dụ cần thay bằng giá trị thực trước khi chạy. Với đường dẫn, /APP_PATH và /TEST_PATH là ký hiệu cả path, thay bằng đường dẫn thật có một dấu / đầu. Các dòng mô tả chức năng của ứng dụng là tiêu chí kiểm thử cần đối chiếu với lựa chọn của TV2.
+
+Ngày biên soạn 03/11/2026. Tài liệu dành cho bạn phụ trách hạ tầng, control plane, Rancher và đường public của đồ án NT132. Cụm dùng ứng dụng do TV2 tự chọn để học Kubernetes Service. Các câu lệnh dưới đây là hướng dẫn để nhóm triển khai; chưa được chạy trên project Google Cloud của nhóm.
+
+**Kết quả bạn cần bàn giao.** Ba VM gia nhập cùng một cụm; hai worker chạy được Pod liên lạc với nhau; bạn mở Rancher từ laptop để chỉ node, workload và Service; người ngoài VPC mở được ứng dụng do TV2 lựa chọn qua IP của load balancer; bạn tự phân biệt được lỗi đường mạng, Service không có endpoint và policy từ chối.
 
 **Thứ tự đọc và thực hiện**
 
@@ -378,7 +382,7 @@ kubectl -n calico-system get pods -o wide
 
 **Bạn vừa cài:** CNI để Pod giao tiếp xuyên worker và thực thi NetworkPolicy sau này. Nếu Typha xuất hiện, TV1 thêm rule từ node tới TCP 5473 theo cấu hình thực. Không dùng trạng thái Running của một Pod Calico làm kết luận cho cả mạng.
 
-Sau khi ba node Ready, tạo một HTTP server thử trên wk-01 và một client thử trên wk-02. Đây là test trước khi áp policy Bookinfo. Trên cp-01, điền image đã ghim của nhóm:
+Sau khi ba node Ready, tạo một HTTP server thử trên wk-01 và một client thử trên wk-02. Đây là test trước khi áp policy ứng dụng do TV2 lựa chọn. Trên cp-01, điền image đã ghim của nhóm:
 
 ```bash
 export HTTP_IMAGE='<image-nginx-tag-hoac-digest-da-chon>'
@@ -472,13 +476,13 @@ Kỳ vọng cp-01, wk-01, wk-02 đều Ready; CoreDNS có replica Available; dae
 
 ### Thao tác 09 · Sắp xếp các cửa sổ terminal
 
-Trên laptop mở bốn tab PowerShell và đặt tên dễ phân biệt. Tab **TUNNEL** chạy lệnh gcloud có -N -L ở dưới và giữ mở. Tab **RANCHER**, **BOOKINFO**, **KIALI** lần lượt SSH vào cp-01 bằng lệnh gcloud compute ssh bình thường, sau đó mỗi tab chạy đúng một lệnh port-forward khi dịch vụ tương ứng đã được cài. Dùng một tab **ADMIN** khác để chạy lệnh quản trị; không dùng tab đang giữ port-forward để gõ thêm lệnh.
+Trên laptop mở bốn tab PowerShell và đặt tên dễ phân biệt. Tab **TUNNEL** chạy lệnh gcloud có -N -L ở dưới và giữ mở. Tab **RANCHER**, **ỨNG_DỤNG**, **KIALI** lần lượt SSH vào cp-01 bằng lệnh gcloud compute ssh bình thường, sau đó mỗi tab chạy đúng một lệnh port-forward khi dịch vụ tương ứng đã được cài. Dùng một tab **ADMIN** khác để chạy lệnh quản trị; không dùng tab đang giữ port-forward để gõ thêm lệnh.
 
 **Kết quả cần thấy:** lệnh tunnel thường đứng chờ, còn port-forward in “Forwarding from 127.0.0.1…”. Đây là trạng thái đang phục vụ kết nối. Nhấn Ctrl+C chỉ khi muốn dừng đường truy cập đó.
 
 Để tránh phải sao chép admin.conf sang ba laptop trong lượt đầu, bạn có thể thực hiện kubectl và Helm trên cp-01 qua SSH. Khi cần mở web trên Windows, ghép SSH local forwarding với kubectl port-forward đang chạy trên cp-01. API vẫn nằm ở IP riêng.
 
-**Laptop/PowerShell, terminal A.** Truyền các cổng local qua SSH. Cổng 8443 sẽ dùng cho Rancher từ bước 11, 8080 cho Bookinfo và 20001 cho Kiali:
+**Laptop/PowerShell, terminal A.** Truyền các cổng local qua SSH. Cổng 8443 sẽ dùng cho Rancher từ bước 11, 8080 cho ứng dụng do TV2 lựa chọn và 20001 cho Kiali:
 
 ```powershell
 gcloud compute ssh cp-01 --zone=asia-southeast1-a --tunnel-through-iap -- -N -L 8443:127.0.0.1:8443 -L 8080:127.0.0.1:8080 -L 20001:127.0.0.1:20001
@@ -514,7 +518,7 @@ kubectl get nodes -o wide > "$HOME/nt132-evidence/nodes-before-dashboard.txt"
 kubectl describe nodes > "$HOME/nt132-evidence/node-resources-before-dashboard.txt"
 ```
 
-Nếu checksum báo lỗi, xử lý download trước khi install. Xem Allocatable và Allocated resources ở describe nodes; dự trù Rancher, ingress quản trị, Istio, Prometheus/Kiali và Bookinfo trên hai worker. Nếu Pending vì thiếu tài nguyên, kiểm tra requests rồi nâng worker theo ngân sách, từng máy một sau khi drain có kiểm soát và workload có khả năng chạy nơi khác.
+Nếu checksum báo lỗi, xử lý download trước khi install. Xem Allocatable và Allocated resources ở describe nodes; dự trù Rancher, ingress quản trị, Istio, Prometheus/Kiali và ứng dụng do TV2 lựa chọn trên hai worker. Nếu Pending vì thiếu tài nguyên, kiểm tra requests rồi nâng worker theo ngân sách, từng máy một sau khi drain có kiểm soát và workload có khả năng chạy nơi khác.
 
 ## 11. Cài Rancher với hostname và TLS hoạt động trong cluster
 
@@ -766,33 +770,33 @@ Lưu output có xác minh TLS thành công và pong. Bài này đi qua DNS/Servi
 
 **Trong Rancher UI**, dùng menu Users & Authentication → Users (tên menu tùy bản), tạo local user dùng để trình chiếu. Vào Cluster Management → local → Members, thêm user bằng role chỉ đọc có sẵn của phiên bản hoặc role tùy chỉnh chỉ cho get/list/watch tài nguyên cần xem. Nếu tài khoản viewer thiếu quyền xem node hoặc namespace, đọc resource bị Forbidden và cấp đúng quyền đọc cần thiết. Đăng xuất admin, đăng nhập viewer bằng cửa sổ browser riêng. Mở Nodes, Workloads và Services để thử. Thử quyền sửa bằng kiểm tra RBAC hoặc thao tác trên workload thử đã chuẩn bị, tránh thay đổi ứng dụng đang báo cáo.
 
-Sau khi login, mở Cluster Management rồi chọn local. Kiểm tra ba node có tên/IP đúng inventory. Trong Cluster Explorer chọn namespace bookinfo khi TV2 đã deploy, mở Workloads và Service ratings. Đọc selector, cổng và Pod đích rồi đối chiếu CLI. Một ảnh UI riêng lẻ cần kèm tên cluster/namespace và giờ để tránh dùng nhầm môi trường.
+Sau khi login, mở Cluster Management rồi chọn local. Kiểm tra ba node có tên/IP đúng inventory. Trong Cluster Explorer chọn namespace APP_NAMESPACE khi TV2 đã deploy, mở Workloads và Service TARGET_SERVICE. Đọc selector, cổng và Pod đích rồi đối chiếu CLI. Một ảnh UI riêng lẻ cần kèm tên cluster/namespace và giờ để tránh dùng nhầm môi trường.
 
 Tạo user trình chiếu với quyền chỉ xem phạm vi cần thiết, đăng nhập lại bằng cửa sổ riêng. Thử xem node/Deployment/Service rồi kiểm tra user không có quyền sửa workload. Admin dùng cho vận hành; user viewer dùng khi mở trước lớp. Lưu ảnh UI cùng output:
 
 ```bash
 kubectl get nodes -o wide
-kubectl -n bookinfo get deploy,pods,svc -o wide
-kubectl -n bookinfo get endpointslice -l kubernetes.io/service-name=ratings -o wide
+kubectl -n APP_NAMESPACE get deploy,pods,svc -o wide
+kubectl -n APP_NAMESPACE get endpointslice -l kubernetes.io/service-name=TARGET_SERVICE -o wide
 kubectl -n cattle-system get pods
 ```
 
 Từ Pod thử có curl, gọi https://rancher.nt132.test/ping với CA lab đã mount vào Pod để xác minh DNS, TLS và HTTP từ trong cluster. Có thể dùng image curl đã ghim của nhóm và ConfigMap chứa **public** ca.crt. Kỳ vọng TLS verify thành công và /ping trả pong. Nếu chỉ browser truy cập được nhưng Pod không gọi được, kiểm tra CoreDNS rewrite và đường Service ingress. Đây là lý do phải thử cả browser và client trong cluster.
 
-## 13. Nhận Bookinfo và Istio từ TV2/TV3
+## 13. Nhận ứng dụng do TV2 lựa chọn và Istio từ TV2/TV3
 
 ### Thao tác 13 · Mở ứng dụng mẫu và quan sát
 
-Nhận xác nhận hai bạn đã deploy xong; chạy khối get ở dưới để xem tài nguyên thật. Tab BOOKINFO SSH cp-01, chạy port-forward gateway. Tab KIALI SSH cp-01, chạy port-forward kiali. Giữ tab TUNNEL mở. Trên browser mở URL localhost ở dưới. Kiali chọn namespace bookinfo và time range 5 phút. Trên PowerShell ADMIN của Windows chạy vòng lặp 120 request. Chờ dữ liệu được thu thập rồi chỉ cạnh reviews → ratings. Nếu chưa có app, gửi output get deploy cho TV2; nếu Istiod/gateway chưa Ready, gửi TV3. Bước này kiểm tra phần hai bạn đã bàn giao.
+Nhận xác nhận hai bạn đã deploy xong; chạy khối get ở dưới để xem tài nguyên thật. Tab ỨNG_DỤNG SSH cp-01, chạy port-forward gateway. Tab KIALI SSH cp-01, chạy port-forward kiali. Giữ tab TUNNEL mở. Trên browser mở URL localhost ở dưới. Kiali chọn namespace APP_NAMESPACE và time range 5 phút. Trên PowerShell ADMIN của Windows chạy vòng lặp 120 request. Chờ dữ liệu được thu thập rồi chỉ cạnh CALLER_SERVICE → TARGET_SERVICE. Nếu chưa có app, gửi output get deploy cho TV2; nếu Istiod/gateway chưa Ready, gửi TV3. Bước này kiểm tra phần hai bạn đã bàn giao.
 
-Yêu cầu TV3 bàn giao version Istio, trạng thái Istiod/gateway, Prometheus và Kiali. TV2 bàn giao namespace bookinfo, deployment reviews-v2, Service ratings, route /productpage và cổng gateway. TV1 tự kiểm tra:
+Yêu cầu TV3 bàn giao version Istio, trạng thái Istiod/gateway, Prometheus và Kiali. TV2 bàn giao namespace APP_NAMESPACE, deployment CALLER_DEPLOYMENT, Service TARGET_SERVICE, route /APP_PATH và cổng gateway. TV1 tự kiểm tra:
 
 ```bash
 kubectl -n istio-system get deploy,svc,pods -o wide
-kubectl -n bookinfo get deploy,pods,svc -o wide
-kubectl -n bookinfo get gateway,virtualservice
-kubectl -n bookinfo get svc ratings -o yaml
-kubectl -n bookinfo get endpointslice -l kubernetes.io/service-name=ratings -o yaml
+kubectl -n APP_NAMESPACE get deploy,pods,svc -o wide
+kubectl -n APP_NAMESPACE get gateway,virtualservice
+kubectl -n APP_NAMESPACE get svc TARGET_SERVICE -o yaml
+kubectl -n APP_NAMESPACE get endpointslice -l kubernetes.io/service-name=TARGET_SERVICE -o yaml
 ```
 
 Mở **cp-01/Bash, mỗi lệnh một terminal**:
@@ -802,11 +806,11 @@ kubectl -n istio-system port-forward svc/istio-ingressgateway 8080:80 --address=
 kubectl -n istio-system port-forward svc/kiali 20001:20001 --address=127.0.0.1
 ```
 
-Với tunnel mục 9 còn mở, Windows mở http://127.0.0.1:8080/productpage và http://127.0.0.1:20001/kiali. Trang phải có điểm sao. TV3 chọn namespace bookinfo trên Kiali. Tạo lượt gọi mới trên **PowerShell**:
+Với tunnel mục 9 còn mở, Windows mở http://127.0.0.1:8080/APP_PATH và http://127.0.0.1:20001/kiali. Trang phải trả nội dung đúng theo bàn giao. TV3 chọn namespace APP_NAMESPACE trên Kiali. Tạo lượt gọi mới trên **PowerShell**:
 
 ```powershell
 1..120 | ForEach-Object {
-    curl.exe -sS --max-time 5 -o NUL -w "%{http_code}\n" http://127.0.0.1:8080/productpage
+    curl.exe -sS --max-time 5 -o NUL -w "%{http_code}\n" http://127.0.0.1:8080/APP_PATH
     Start-Sleep -Seconds 1
 }
 ```
@@ -823,8 +827,8 @@ Với tunnel mục 9 còn mở, Windows mở http://127.0.0.1:8080/productpage v
 
 ```bash
 kubectl -n istio-system get svc istio-ingressgateway -o yaml
-curl -sv --max-time 10 http://10.20.0.11:30080/productpage -o /tmp/nt132-w1.html
-curl -sv --max-time 10 http://10.20.0.12:30080/productpage -o /tmp/nt132-w2.html
+curl -sv --max-time 10 http://10.20.0.11:30080/APP_PATH -o /tmp/nt132-w1.html
+curl -sv --max-time 10 http://10.20.0.12:30080/APP_PATH -o /tmp/nt132-w2.html
 kubectl -n istio-system get endpointslice -l kubernetes.io/service-name=istio-ingressgateway
 ```
 
@@ -862,18 +866,18 @@ Chờ backend chuyển healthy rồi thử URL. Với passthrough LB, cổng v�
 
 ### 14.3. Kiểm tra từ ngoài cụm
 
-**Thao tác 14C.** Điền $WebIp trên Windows bằng IP frontend vừa tạo. Chạy curl ở dưới rồi mở cùng URL trong browser. Gửi URL cho TV3 để bạn ấy thử từ mạng ngoài VPC. Lưu URL, giờ thử, ảnh có sao và output get-health. Nếu localhost qua tunnel chạy mà URL public không chạy, dùng bảng mục 18 để kiểm tra riêng chặng LB/NodePort.
+**Thao tác 14C.** Điền $WebIp trên Windows bằng IP frontend vừa tạo. Chạy curl ở dưới rồi mở cùng URL trong browser. Gửi URL cho TV3 để bạn ấy thử từ mạng ngoài VPC. Lưu URL, giờ thử, ảnh trả nội dung đúng và output get-health. Nếu localhost qua tunnel chạy mà URL public không chạy, dùng bảng mục 18 để kiểm tra riêng chặng LB/NodePort.
 
 **Laptop/PowerShell.** Điền IP nhận được từ describe:
 
 ```powershell
 $WebIp = '<IP-frontend>'
-curl.exe -v --max-time 10 "http://$($WebIp):30080/productpage"
+curl.exe -v --max-time 10 "http://$($WebIp):30080/APP_PATH"
 ```
 
-Mở cùng URL bằng browser. Yêu cầu TV3 thử từ mạng khác; ghi HTTP status, ảnh trang có sao, giờ thử và IP frontend. Trong Kiali chọn cửa sổ tương ứng để thấy request mới. Lưu ba bằng chứng cạnh nhau: forwarding rule chứa IP/cổng, get-health có hai backend, browser ngoài VPC thấy trang.
+Mở cùng URL bằng browser. Yêu cầu TV3 thử từ mạng khác; ghi HTTP status, ảnh trang trả nội dung đúng, giờ thử và IP frontend. Trong Kiali chọn cửa sổ tương ứng để thấy request mới. Lưu ba bằng chứng cạnh nhau: forwarding rule chứa IP/cổng, get-health có hai backend, browser ngoài VPC thấy trang.
 
-**Cách giải thích với thầy.** Load balancer đưa kết nối tới worker; Service NodePort chọn gateway endpoint; Envoy gateway xử lý route ứng dụng; productpage gọi các Service nội bộ để lấy thông tin. K8s Service của gateway vẫn là NodePort. Tài nguyên LB của cloud được nhóm tự tạo và nối vào cổng này.
+**Cách giải thích với thầy.** Load balancer đưa kết nối tới worker; Service NodePort chọn gateway endpoint; Envoy gateway xử lý route ứng dụng; ENTRY_SERVICE gọi các Service nội bộ để lấy thông tin. K8s Service của gateway vẫn là NodePort. Tài nguyên LB của cloud được nhóm tự tạo và nối vào cổng này.
 
 ## 15. Các bài thực hành Service bạn phải tự chạy được
 
@@ -882,18 +886,18 @@ Mở cùng URL bằng browser. Yêu cầu TV3 thử từ mạng khác; ghi HTTP 
 **cp-01/Bash**:
 
 ```bash
-kubectl -n bookinfo get svc ratings -o yaml
-kubectl -n bookinfo get pods -l app=ratings -o wide
-kubectl -n bookinfo get endpointslice -l kubernetes.io/service-name=ratings -o yaml
+kubectl -n APP_NAMESPACE get svc TARGET_SERVICE -o yaml
+kubectl -n APP_NAMESPACE get pods -l app=TARGET_LABEL -o wide
+kubectl -n APP_NAMESPACE get endpointslice -l kubernetes.io/service-name=TARGET_SERVICE -o yaml
 ```
 
-Đọc spec.selector app=ratings, so với metadata.labels của Pod. Đọc port=9080 và targetPort; so endpoint port và địa chỉ Pod. EndpointSlice có targetRef và điều kiện ready. ClusterIP là địa chỉ frontend nội bộ ổn định trong vòng đời Service. Khi Pod đổi, endpoint đổi theo tình trạng backend; tên Service giúp client tiếp tục gọi.
+Đọc spec.selector app=TARGET_LABEL, so với metadata.labels của Pod. Đọc port=SERVICE_PORT và targetPort; so endpoint port và địa chỉ Pod. EndpointSlice có targetRef và điều kiện ready. ClusterIP là địa chỉ frontend nội bộ ổn định trong vòng đời Service. Khi Pod đổi, endpoint đổi theo tình trạng backend; tên Service giúp client tiếp tục gọi.
 
 TV2 thay đúng một Pod do Deployment quản lý trong phiên thử. Bạn ghi UID cũ/mới, thời điểm Pod mới Ready và kết quả gọi lại. Một replica có thể gián đoạn lúc thay Pod. Cùng Pod IP không đảm bảo cùng Pod; UID là bằng chứng phân biệt.
 
 ### 15.2. Sửa một Service thử có selector sai
 
-TV3 tạo Service ratings-selector-test trong bookinfo với selector không khớp. Bạn nhận tên resource và triệu chứng, chạy get svc/get endpointslice để nhận ra thiếu endpoint. Sửa **file thử** về selector app=ratings, apply đúng file đó, đợi endpoint Ready rồi nhờ TV2 gọi lại từ Pod reviews có quyền. Ghi trạng thái trước/sau và xóa riêng Service thử sau khi bàn giao.
+TV3 tạo Service service-selector-test trong APP_NAMESPACE với selector không khớp. Bạn nhận tên resource và triệu chứng, chạy get svc/get endpointslice để nhận ra thiếu endpoint. Sửa **file thử** về selector app=TARGET_LABEL, apply đúng file đó, đợi endpoint Ready rồi nhờ TV2 gọi lại từ Pod CALLER_SERVICE có quyền. Ghi trạng thái trước/sau và xóa riêng Service thử sau khi bàn giao.
 
 Nếu có EndpointSlice nhưng GET vẫn lỗi, chuyển sang kiểm tra port, readiness, policy và source identity. DNS phân giải được chỉ xác nhận tên đã có câu trả lời. Kiali không tự chứng minh request có quyền; cần mã HTTP và log của lớp đang thử.
 
@@ -901,12 +905,12 @@ Nếu có EndpointSlice nhưng GET vẫn lỗi, chuyển sang kiểm tra port, r
 
 Trước khi thử, hỏi hai bạn đã bật policy nào. Nhận tên Pod nguồn, ServiceAccount, đường dẫn, config mTLS và lệnh curl trong Pod. Thực hiện bốn lượt theo thứ tự:
 
-| Lượt | Cấu hình | reviews → ratings | productpage → ratings trực tiếp | Bạn lưu gì |
+| Lượt | Cấu hình | CALLER_SERVICE → TARGET_SERVICE | ENTRY_SERVICE → TARGET_SERVICE trực tiếp | Bạn lưu gì |
 |---|---|---|---|---|
 | 1 | STRICT, chưa hạn chế hai nguồn | 200 | 200 | Endpoint tồn tại, nguồn/đích, timestamp |
 | 2 | Chỉ thêm AuthorizationPolicy của TV2 | 200 | 403 | Log Envoy đích ghi từ chối RBAC |
 | 3 | Bỏ AuthorizationPolicy, phục hồi lượt 1 rồi chỉ bật NetworkPolicy của TV3 | Thành công | Lỗi kết nối/upstream | DNS vẫn phân giải; kết quả khi gỡ luật phục hồi |
-| 4 | Bật cả hai | Thành công | Bị chặn | Trang public vẫn có sao qua reviews |
+| 4 | Bật cả hai | Thành công | Bị chặn | Trang public vẫn trả nội dung đúng qua CALLER_SERVICE |
 
 Giữ timeout hữu hạn. Nếu nguồn dùng proxy, lỗi upstream do NetworkPolicy có thể thành HTTP 503. Kết luận dựa vào đối chứng và lớp vừa thay đổi, không dựa vào một mã lỗi duy nhất. Viết SEC04 là kết quả bạn trực tiếp kiểm tra.
 
@@ -918,15 +922,15 @@ Dùng Ngày 1–5 tương đối theo ngày bạn bắt đầu. Nếu bắt đ�
 |---|---|---|---|
 | Ngày 1 | Project, IAM, VPC, firewall, VM, runtime cp-01 | OS/runtime worker và bảng phiên bản | Inventory, ba lần SSH, output version |
 | Ngày 2 | Init, cấp join, kiểm tra control plane | Worker join, Calico, thử mạng xuyên worker | Ba node Ready, DNS/HTTP liên node |
-| Ngày 3 | Helm, Traefik, CA/TLS, CoreDNS và Rancher | Istiod/gateway Ready, Bookinfo có sao | Rancher đăng nhập và Pod nội bộ gọi server URL được |
+| Ngày 3 | Helm, Traefik, CA/TLS, CoreDNS và Rancher | Istiod/gateway Ready, ứng dụng do TV2 lựa chọn trả nội dung đúng | Rancher đăng nhập và Pod nội bộ gọi server URL được |
 | Ngày 4 | User viewer, mở lại từ laptop trình chiếu | Kiali có graph, bài thay Pod | Dashboard, endpoint trước/sau, log request |
 | Ngày 5 | Diễn tập và báo cáo | Hai bạn thực hiện đúng phần mình | Video/ảnh ghi ngày, commit, danh sách việc còn lại |
 | Tuần 2 | LB, public IP, Rancher hoàn thiện | NodePort trên hai worker đạt | PUB01, ADM01 |
 | Tuần 3–4 | Chạy ca đối chứng, tích hợp và tiếp quản bài sửa Service | Manifest/ca thử policy và selector | SEC04, SVC04 và runbook có người kiểm tra |
 
-**Phần nói của bạn trong 2 phút đầu.** Mở ba VM, chỉ IP riêng cp-01/wk-01/wk-02. Mở Rancher local cluster và khớp ba node. Chọn một Pod ratings, đọc trường Node rồi đối chiếu với VM. Chuyển sang Service ratings và hỏi TV2 trình bày vì sao tên Service vẫn dùng được khi Pod thay đổi. Giữ phần cloud LB cho buổi đã có URL public.
+**Phần nói của bạn trong 2 phút đầu.** Mở ba VM, chỉ IP riêng cp-01/wk-01/wk-02. Mở Rancher local cluster và khớp ba node. Chọn một Pod thuộc Service TARGET_SERVICE, đọc trường Node rồi đối chiếu với VM. Chuyển sang Service TARGET_SERVICE và hỏi TV2 trình bày vì sao tên Service vẫn dùng được khi Pod thay đổi. Giữ phần cloud LB cho buổi đã có URL public.
 
-**Trước báo cáo 30 phút.** Kiểm tra project/context, tunnel, CA chưa hết hạn và tài khoản viewer. Mở sẵn Rancher, Bookinfo và Kiali. TV3 sinh traffic mới. Xác nhận trang có sao và cửa sổ metrics đúng giờ. Nếu dùng bản quay vì mất mạng phòng học, ghi thời điểm bản quay thay vì mô tả là lượt chạy trực tiếp.
+**Trước báo cáo 30 phút.** Kiểm tra project/context, tunnel, CA chưa hết hạn và tài khoản viewer. Mở sẵn Rancher, ứng dụng do TV2 lựa chọn và Kiali. TV3 sinh traffic mới. Xác nhận trang trả nội dung đúng và cửa sổ metrics đúng giờ. Nếu dùng bản quay vì mất mạng phòng học, ghi thời điểm bản quay thay vì mô tả là lượt chạy trực tiếp.
 
 ## 17. Vận hành hằng ngày, sao lưu và phục hồi
 
@@ -973,7 +977,7 @@ Dùng tên theo ngày khi giữ nhiều phiên bản để không ghi đè snaps
 
 ### 17.3. Tạm dừng lab
 
-Nếu chỉ nghỉ ngắn, chọn dừng VM sau khi lưu bằng chứng và xác định các workload sẽ tắt. Khi bật lại, bật cp-01 trước để API sẵn sàng, bật worker, kiểm tra CNI/CoreDNS, Rancher, Istio và Bookinfo rồi mới gọi public URL. External IP động của VM có thể đổi; quản trị qua tên VM/IAP và IP riêng đã dành giảm phụ thuộc vào IP đó. IP frontend LB dành riêng giữ URL demo trong thời gian reservation còn tồn tại. Disk, LB và IP có thể còn phí khi VM dừng.
+Nếu chỉ nghỉ ngắn, chọn dừng VM sau khi lưu bằng chứng và xác định các workload sẽ tắt. Khi bật lại, bật cp-01 trước để API sẵn sàng, bật worker, kiểm tra CNI/CoreDNS, Rancher, Istio và ứng dụng do TV2 lựa chọn rồi mới gọi public URL. External IP động của VM có thể đổi; quản trị qua tên VM/IAP và IP riêng đã dành giảm phụ thuộc vào IP đó. IP frontend LB dành riêng giữ URL demo trong thời gian reservation còn tồn tại. Disk, LB và IP có thể còn phí khi VM dừng.
 
 ## 18. Bảng xử lý lỗi dành riêng cho TV1
 
@@ -1027,7 +1031,7 @@ Token join, kubeconfig admin và private key phải được giữ trong kho ri�
 
 ### 19.2. Mẫu giải thích trước thầy
 
-“Nhóm tạo ba VM Compute Engine. cp-01 chạy API server và các thành phần điều khiển; hai worker chạy Pod. Rancher đang quản trị cụm local này. Ở đây ratings có tên Service, selector và endpoint thực tế. Sau khi Pod thay đổi, client tiếp tục gọi cùng tên. Request từ ngoài đi qua IP của LB, cổng NodePort 30080 và Istio gateway. Hai lớp policy kiểm soát nguồn nào được gọi tới Service.”
+“Nhóm tạo ba VM Compute Engine. cp-01 chạy API server và các thành phần điều khiển; hai worker chạy Pod. Rancher đang quản trị cụm local này. Ở đây TARGET_SERVICE có tên Service, selector và endpoint thực tế. Sau khi Pod thay đổi, client tiếp tục gọi cùng tên. Request từ ngoài đi qua IP của LB, cổng NodePort 30080 và Istio gateway. Hai lớp policy kiểm soát nguồn nào được gọi tới Service.”
 
 Khi được hỏi Service có phải một process chạy trong Pod không, chỉ ra Service là tài nguyên mô tả địa chỉ/cổng và nhóm backend. Dùng EndpointSlice và Pod để giải thích data plane thực tế; trong mesh proxy có thể chọn endpoint từ cấu hình do Istiod cung cấp. Bạn cần hiểu mối liên hệ này vì cloud LB chỉ là chặng đầu của request.
 
@@ -1058,7 +1062,7 @@ Gỡ dòng hosts rancher.nt132.test và CA lab trong trust store sau khi kết t
 | Mạng | Client và server trên hai worker gọi được bằng IP Pod và tên Service | ☐ |
 | Rancher | Login bằng hostname tin cậy, thấy đúng local cluster, agent truy cập server URL được | ☐ |
 | Viewer | Tài khoản trình chiếu đọc được thông tin cần thiết, không sửa workload | ☐ |
-| Bookinfo | Truy cập qua gateway có điểm sao; graph có luồng thật | ☐ |
+| ứng dụng do TV2 lựa chọn | Truy cập qua gateway trả nội dung đúng theo bàn giao; graph có luồng thật | ☐ |
 | Public | Client ngoài VPC mở đúng IP frontend, cả hai backend healthy | ☐ |
 | Service | Giải thích selector, endpoint và Pod; tái hiện sửa selector sai | ☐ |
 | Policy | Tự chạy đối chứng và lượt kết hợp, lưu nguồn/đích/kết quả | ☐ |
