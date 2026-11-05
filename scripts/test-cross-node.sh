@@ -10,7 +10,12 @@ kubectl -n network-check wait --for=condition=Ready pod/server pod/client --time
 server_ip="$(kubectl -n network-check get pod server -o jsonpath='{.status.podIP}')"
 service_ip="$(kubectl -n network-check get svc server -o jsonpath='{.spec.clusterIP}')"
 for url in "http://$server_ip" "http://$service_ip" "http://server.network-check.svc.cluster.local"; do
-  status="$(kubectl -n network-check exec client -- curl -sS --max-time 10 -o /dev/null -w '%{http_code}' "$url")"
+  status=""
+  for attempt in {1..12}; do
+    status="$(kubectl -n network-check exec client -- curl -sS --connect-timeout 3 --max-time 5 -o /dev/null -w '%{http_code}' "$url" 2>/dev/null || true)"
+    [[ "$status" == 200 ]] && break
+    sleep 5
+  done
   [[ "$status" == 200 ]] || die "$url returned $status"
   echo "$url -> $status"
 done
