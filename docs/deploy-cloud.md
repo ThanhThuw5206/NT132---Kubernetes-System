@@ -129,6 +129,8 @@ kubectl get tigerastatus
 
 Phải thấy đủ ba node Ready, CoreDNS Running, Calico Available. Node NotReady trước khi cài CNI là trạng thái dự kiến. Giữ taint control plane, không đưa ứng dụng lên cp-01 để chữa thiếu tài nguyên. Nếu join thất bại, kiểm tra `sudo journalctl -u kubelet -n 80 --no-pager` trên worker và kết nối API nội bộ; không chạy `kubeadm reset` tùy tiện.
 
+Tên Kubernetes Node của worker trên GCE có thể là tên đầy đủ `wk-01.<zone>.c.<project>.internal`. Đây không phải lỗi join. Script nhận diện ba node theo InternalIP 10.20.0.10–12; không cần reset hoặc đổi hostname. Bài test Service gán label `nt132.lab/worker` cho hai worker trước khi đặt Pod lên đúng máy.
+
 ## 6. Kiểm chứng mạng và Kubernetes Service trước dashboard
 
 Trên **cp-01**:

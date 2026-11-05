@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 source "$(dirname "$0")/lib.sh"
 cluster_ready
+lab_nodes
+# Stable lab aliases avoid depending on GCE's short hostname versus FQDN.
+kubectl label node "${LAB_NODES[1]}" nt132.lab/worker=wk-01 --overwrite
+kubectl label node "${LAB_NODES[2]}" nt132.lab/worker=wk-02 --overwrite
 kubectl apply -f "$ROOT/tests/service/network-check.yaml"
 kubectl -n network-check wait --for=condition=Ready pod/server pod/client --timeout=180s
 server_ip="$(kubectl -n network-check get pod server -o jsonpath='{.status.podIP}')"

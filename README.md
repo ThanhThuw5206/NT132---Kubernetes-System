@@ -33,6 +33,7 @@ Thông số ứng dụng nhập qua `config/application.json` theo file example.
 ## Tài liệu bắt đầu
 
 - [Triển khai cloud từng bước](docs/deploy-cloud.md)
+- [Bật/tắt lab mỗi buổi để tiết kiệm chi phí](docs/bat-tat-lab.md)
 - [Kế hoạch tổng thể](docs/plan.md)
 - [Hướng dẫn TV1](docs/tv1-setup.md)
 - [Inventory mẫu](docs/inventory.example.md)

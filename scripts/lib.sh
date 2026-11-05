@@ -12,3 +12,10 @@ cluster_ready() {
   actual="$(kubectl get node cp-01 -o jsonpath='{.status.addresses[?(@.type=="InternalIP")].address}')"
   [[ "$actual" == "10.20.0.10" ]] || die "Wrong cluster: cp-01 must have InternalIP 10.20.0.10."
 }
+lab_nodes() {
+  need python3
+  local mapping
+  mapping="$(kubectl get nodes -o json | python3 "$ROOT/scripts/cluster-nodes.py")" || die "Cannot identify the three lab nodes."
+  mapfile -t LAB_NODES <<<"$mapping"
+  [[ ${#LAB_NODES[@]} -eq 3 ]] || die "Expected three lab nodes."
+}

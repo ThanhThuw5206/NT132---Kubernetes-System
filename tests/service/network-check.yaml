@@ -13,7 +13,7 @@ metadata:
     app: network-check-server
 spec:
   nodeSelector:
-    kubernetes.io/hostname: wk-01
+    nt132.lab/worker: wk-01
   containers:
     - name: http
       image: nginx:1.28.0-alpine
@@ -50,7 +50,7 @@ metadata:
   namespace: network-check
 spec:
   nodeSelector:
-    kubernetes.io/hostname: wk-02
+    nt132.lab/worker: wk-02
   containers:
     - name: curl
       image: curlimages/curl:8.14.1
