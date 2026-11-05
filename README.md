@@ -22,7 +22,7 @@
 | scripts/ | Script thao tác có phạm vi rõ ràng và hướng dẫn chạy. |
 | docs/ | Kế hoạch, hướng dẫn, inventory và bằng chứng đã loại thông tin nhạy cảm. |
 
-Repository đã có Terraform tạo ba VM, script bootstrap kubeadm/Calico, Helm values cho Rancher/Istio và script dashboard. Hạ tầng chưa được apply vào project thật. Ứng dụng do TV2 lựa chọn và bổ sung.
+Repository đã có Terraform tạo ba VM, script bootstrap kubeadm/Calico, Helm values cho Rancher/Istio và script dashboard. Ngày 05/11/2026, cụm ba node đã được kiểm chứng Ready, Kubernetes Service/DNS hoạt động và Rancher hiển thị đủ ba node Active. Ứng dụng do TV2 lựa chọn và bổ sung.
 
 **Bắt đầu tại [hướng dẫn triển khai cloud](docs/deploy-cloud.md)**: có từng lệnh chạy tại Cloud Shell, VM và Windows, kiểm tra sau mỗi giai đoạn, lịch năm ngày và cách dọn tài nguyên. Đây là nguồn hướng dẫn thao tác cho bộ config hiện tại; không chạy xen kẽ lệnh tạo hạ tầng trong tài liệu cũ.
 
@@ -34,6 +34,7 @@ Thông số ứng dụng nhập qua `config/application.json` theo file example.
 
 - [Triển khai cloud từng bước](docs/deploy-cloud.md)
 - [Bật/tắt lab mỗi buổi để tiết kiệm chi phí](docs/bat-tat-lab.md)
+- [Thêm TV2/TV3, phân quyền và bàn giao công việc](docs/them-thanh-vien.md)
 - [Kế hoạch tổng thể](docs/plan.md)
 - [Hướng dẫn TV1](docs/tv1-setup.md)
 - [Inventory mẫu](docs/inventory.example.md)
