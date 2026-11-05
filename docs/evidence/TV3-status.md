@@ -2,6 +2,8 @@
 
 Phạm vi đã thực hiện: **source, công cụ và kiểm tra local** trên laptop Windows. Source nền `17aaed9`; nhánh bàn giao `tv3/istio-network`. Ghi commit thực tế bằng `git rev-parse HEAD` khi lấy mã. Không tạo VM/LB, không cài hoặc đổi policy trên cụm cloud trong phiên này.
 
+**Cập nhật nhận từ TV1:** branch `tv1/cloud-config` tại `612e3b0` ghi nhận ba node Ready, Pod IP/ClusterIP/DNS trả 200 và Rancher thấy ba node Active ngày 05/11/2026; Istio/Kiali/app/policy chưa triển khai. Đây là trạng thái TV1 bàn giao trong repo, không phải một lần nghiệm thu cloud mới của TV3. Các bảng Chưa chạy dưới đây nói về các ca TV3 trong phiên chuẩn bị này; nhận quyền/inventory trước khi thử lại, không dựng trùng hoặc reset cụm đang có.
+
 ## Đã hoàn thành trên máy
 
 | Sản phẩm | File / kết quả |
@@ -27,7 +29,7 @@ Môi trường: Python **3.15.2** từ runtime uv đã có trên máy; Git Bash 
 
 ```text
 uv run --offline --no-project python -m unittest discover -s tests -v
-Ran 32 tests
+Ran 37 tests
 OK
 
 uv run --offline --no-project python scripts/tv3.py --help
@@ -40,7 +42,7 @@ git diff --check
 Passed
 ```
 
-32 test gồm: 5 test renderer có sẵn; 6 test điều phối NET01/Calico với kubectl/curl giả; 11 test công cụ TV3; 4 test package/native sidecar/ánh xạ Service–Pod; 6 test HTTP body/timeout/report (có server loopback thật). Các ca lỗi bao gồm DNS/thiếu lệnh, Pod cùng node, resource thuộc người khác, Calico Degraded, config placeholder, ghi đè output, endpoint sai Pod UID, rollout cũ, package thiếu/chứa file không được phép hoặc bị đổi sau đóng gói, body bị cắt/chunk sai/quá lớn và Ctrl+C. Các test này không chứng minh CNI/mesh/policy đang hoạt động trên Google Cloud.
+37 test gồm: 5 test renderer; 3 test nhận diện node theo InternalIP; 8 test NET01/Calico với kubectl/curl giả; 11 test công cụ TV3; 4 test package/native sidecar/ánh xạ Service–Pod; 6 test HTTP body/timeout/report (có server loopback thật). NET01 và snapshot đã được kết hợp với hỗ trợ FQDN của TV1; các test kiểm tra cả retry tạm thời và ghi lại lỗi từng lần. Các ca lỗi khác bao gồm DNS/thiếu lệnh, Pod cùng node, resource thuộc người khác, Calico Degraded, config placeholder, ghi đè output, endpoint sai Pod UID, rollout cũ, package thiếu/chứa file không được phép hoặc bị đổi sau đóng gói, body bị cắt/chunk sai/quá lớn và Ctrl+C. Các test này không chứng minh CNI/mesh/policy đang hoạt động trên Google Cloud.
 
 Đã rà lại phân công với kế hoạch đồ án: TV3 chủ trì NET01/OBS01/SEC03/SVC04, kiểm tra chéo IAM01/SVC02/SEC01/SVC03/PUB01 và phối hợp OPS01. Các thành viên xem phiếu bàn giao để nhận đúng source/đầu việc; phần ứng dụng, Service/route và luật Istio vẫn do TV2 xác nhận, hạ tầng/Rancher/LB do TV1 phụ trách.
 

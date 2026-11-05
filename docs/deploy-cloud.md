@@ -131,6 +131,8 @@ kubectl get tigerastatus
 
 Phải thấy đủ ba node Ready, CoreDNS Running, Calico Available. Node NotReady trước khi cài CNI là trạng thái dự kiến. Giữ taint control plane, không đưa ứng dụng lên cp-01 để chữa thiếu tài nguyên. Nếu join thất bại, kiểm tra `sudo journalctl -u kubelet -n 80 --no-pager` trên worker và kết nối API nội bộ; không chạy `kubeadm reset` tùy tiện.
 
+Tên Kubernetes Node của worker trên GCE có thể là tên đầy đủ `wk-01.<zone>.c.<project>.internal`. Đây không phải lỗi join. Script nhận diện ba node theo InternalIP 10.20.0.10–12; không cần reset hoặc đổi hostname. Bài test Service gán label `nt132.lab/worker` cho hai worker trước khi đặt Pod lên đúng máy.
+
 ## 6. Kiểm chứng mạng và Kubernetes Service trước dashboard
 
 Trên **cp-01**:
@@ -321,6 +323,8 @@ Chạy curl từ máy thuộc CIDR được cho phép. Hai worker phải healthy
 
 ## 12. Lịch năm ngày và trách nhiệm
 
+Sau khi TV1 mở được Rancher, dùng [hướng dẫn thêm thành viên](them-thanh-vien.md) để mời TV2/TV3 vào GitHub, Google Cloud và Rancher bằng tài khoản riêng, rồi bàn giao branch và nhiệm vụ.
+
 | Ngày | TV1 | TV2 | TV3 | Điều kiện chốt ngày |
 |---|---|---|---|---|
 | 1 | Project/IAM/budget, Terraform tạo3VM, chuẩn bị cp-01 và init. | Chọn app, ghi nguồn/license/version, chuẩn bị wk-01 và join. | Chuẩn bị wk-02 và join; cài Calico cùng TV1. | Ba node Ready, inventory không có secret. |
@@ -378,6 +382,6 @@ Terraform chỉ dọn tài nguyên nó quản lý, không xóa cả project. Cá
 
 ## 15. Phạm vi đã kiểm tra của bộ config
 
-Đã có kiểm tra local: Terraform format/validate và mock test topology, render Helm chart đúng version, parse YAML, syntax Bash và unit test renderer ứng dụng. Những bước đó không thay thế nghiệm thu trên cloud. Chưa chạy apply vào project Google Cloud của bạn; chỉ có thể xác nhận vận hành end-to-end sau khi tạo VM và chạy các bước phía trên. Repo không chứa credentials, project ID thật, token join hoặc ứng dụng được chọn thay TV2.
+Đã có kiểm tra local: Terraform format/validate và mock test topology, render Helm chart đúng version, parse YAML, syntax Bash và unit test renderer ứng dụng. Ngày 05/11/2026, nhóm đã apply hạ tầng, đưa ba node v1.35.10 về Ready, kiểm chứng Pod IP/ClusterIP/DNS khác node trả HTTP 200 và mở Rancher v2.15.3 với đủ ba node Active. Istio, Kiali, ứng dụng TV2 và các policy theo ứng dụng chưa được triển khai. Repo không chứa credentials, token join, private key, mật khẩu Rancher hoặc ứng dụng được chọn thay TV2.
 
 Tham khảo chính thức: [kubeadm](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/), [Istio supported releases](https://istio.io/latest/docs/releases/supported-releases/), [Rancher installation](https://ranchermanager.docs.rancher.com/getting-started/installation-and-upgrade/install-upgrade-on-a-kubernetes-cluster/), [Calico requirements](https://docs.tigera.io/calico/latest/getting-started/kubernetes/requirements), [IAP TCP forwarding](https://cloud.google.com/iap/docs/using-tcp-forwarding), [Google Cloud passthrough LB](https://cloud.google.com/load-balancing/docs/network/setting-up-network-backend-service).

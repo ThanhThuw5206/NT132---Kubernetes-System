@@ -9,6 +9,8 @@ cluster/calico/README.md
 cluster/calico/installation.yaml
 docs/application-handover.md
 docs/deploy-cloud.md
+docs/bat-tat-lab.md
+docs/them-thanh-vien.md
 docs/tv3-current-work.md
 docs/tv3-runbook.md
 docs/tv3-handover.md
@@ -20,11 +22,13 @@ mesh/istio/istiod-values.yaml
 network/policies/README.md
 observability/README.md
 scripts/lib.sh
+scripts/cluster-nodes.py
 scripts/01-prepare-node.sh
 scripts/03-install-calico.sh
 scripts/04-install-helm.sh
 scripts/05-install-istio.sh
 scripts/07-install-observability.sh
+scripts/08-verify-cluster.sh
 scripts/09-port-forward.sh
 scripts/windows-tunnel.ps1
 scripts/render-application.py
@@ -34,6 +38,7 @@ tests/service/network-check.yaml
 tests/service/README.md
 tests/security/README.md
 tests/test_application_renderer.py
+tests/test_cluster_nodes.py
 tests/test_cross_node.py
 tests/test_tv3.py
 tests/test_tv3_traffic.py

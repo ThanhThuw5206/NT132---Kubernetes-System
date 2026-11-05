@@ -21,6 +21,9 @@ BASE_COMMIT = "17aaed9"
 spec = importlib.util.spec_from_file_location("application_renderer", ROOT / "scripts/render-application.py")
 renderer = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(renderer)
+nodes_spec = importlib.util.spec_from_file_location("cluster_nodes", ROOT / "scripts/cluster-nodes.py")
+cluster_nodes = importlib.util.module_from_spec(nodes_spec)
+nodes_spec.loader.exec_module(cluster_nodes)
 
 
 def timestamp():
@@ -209,12 +212,19 @@ def snapshot(args):
     for node in nodes:
         info = node.get("status", {}).get("nodeInfo", {})
         report["nodes"].append({"name": node["metadata"]["name"], "ready": is_ready(node),
+                                "internal_ips": [a["address"] for a in node.get("status", {}).get("addresses", [])
+                                                 if a.get("type") == "InternalIP"],
                                 "versions": {k: info.get(k) for k in
                                              ("kubeletVersion", "containerRuntimeVersion", "osImage", "kernelVersion")}})
-    expected = {"cp-01", "wk-01", "wk-02"}
-    actual_ready = {n["name"] for n in report["nodes"] if n["ready"]}
-    if not expected <= actual_ready:
-        report["errors"].append("Missing or NotReady nodes: " + ", ".join(sorted(expected - actual_ready)))
+    try:
+        resolved = cluster_nodes.resolve({"items": nodes})
+        report["node_aliases"] = dict(zip(("cp-01", "wk-01", "wk-02"), resolved))
+        expected = set(resolved)
+        actual_ready = {n["name"] for n in report["nodes"] if n["ready"]}
+        if not expected <= actual_ready:
+            report["errors"].append("NotReady lab nodes: " + ", ".join(sorted(expected - actual_ready)))
+    except ValueError as exc:
+        report["errors"].append("Cannot identify lab nodes by InternalIP: " + str(exc))
     for ns, name in [("kube-system", "coredns"), ("istio-system", "istiod"),
                      ("istio-system", "istio-ingressgateway"), ("istio-system", "prometheus"),
                      ("istio-system", "kiali")]:

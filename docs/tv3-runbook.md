@@ -32,8 +32,10 @@ TV1 vẫn sở hữu cloud/Rancher/LB; TV2 sở hữu ứng dụng/Service/route
 
 Nhận project/zone, quyền IAM/IAP, VM và join command riêng từ TV1; dùng cùng phiên bản source. Đọc [bảng Calico/CIDR](../cluster/calico/README.md) và [deploy-cloud.md](deploy-cloud.md), phần 4–6. Không tạo thêm `wk-02` nếu Terraform đã tạo. Trên **wk-02**, tại thư mục source:
 
+Cập nhật TV1 tại `612e3b0` báo cụm/Service/Rancher đã hoạt động; xem [runbook bật/tắt lab](bat-tat-lab.md) và [hướng dẫn thêm thành viên](them-thanh-vien.md) để nhận quyền và trạng thái hiện tại trước khi chạy lại bootstrap. Worker có thể mang tên Node FQDN trên GCE; các script nhận diện bằng InternalIP và dùng nhãn `nt132.lab/worker` để đặt Pod thử, không yêu cầu reset worker để đổi tên.
+
 ```bash
-hostname  # phải là wk-02
+hostname -s  # phải là wk-02; tên Node trong Kubernetes có thể là FQDN
 sudo bash scripts/01-prepare-node.sh
 sudo systemctl is-active containerd
 kubelet --version

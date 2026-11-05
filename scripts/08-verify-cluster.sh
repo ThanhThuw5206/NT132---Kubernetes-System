@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 source "$(dirname "$0")/lib.sh"
 cluster_ready
-kubectl wait --for=condition=Ready node/cp-01 node/wk-01 node/wk-02 --timeout=180s
+lab_nodes
+kubectl wait --for=condition=Ready node "${LAB_NODES[@]}" --timeout=180s
 kubectl -n kube-system rollout status deploy/coredns --timeout=180s
 kubectl -n cattle-system rollout status deploy/rancher --timeout=180s
 kubectl -n istio-system rollout status deploy/istiod --timeout=180s

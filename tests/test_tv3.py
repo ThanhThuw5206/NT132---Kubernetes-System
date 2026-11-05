@@ -101,8 +101,10 @@ class TV3Tests(unittest.TestCase):
             def fake_json(context, *args):
                 if args == ("get", "nodes"):
                     return {"items": [{"metadata": {"name": name}, "status": {
-                        "conditions": [{"type": "Ready", "status": "True"}], "nodeInfo": {}}}
-                        for name in ("cp-01", "wk-01", "wk-02")]}
+                        "conditions": [{"type": "Ready", "status": "True"}], "nodeInfo": {},
+                        "addresses": [{"type": "InternalIP", "address": ip}]}}
+                        for name, ip in [("cp-01", "10.20.0.10"), ("wk-01.zone.c.project.internal", "10.20.0.11"),
+                                         ("wk-02.zone.c.project.internal", "10.20.0.12")]]}
                 if args == ("get", "tigerastatus"):
                     return {"items": [{"metadata": {"name": "calico"}, "status": {
                         "conditions": [{"type": "Available", "status": "True"}]}}]}
@@ -119,6 +121,7 @@ class TV3Tests(unittest.TestCase):
                 self.assertEqual(tv3.snapshot(args), expected_exit)
                 report = json.loads((args.output / "snapshot.json").read_text(encoding="utf-8"))
                 self.assertEqual(report["checks_passed"], expected_exit == 0)
+                self.assertEqual(report["node_aliases"]["wk-01"], "wk-01.zone.c.project.internal")
 
     def test_probe_requires_a_ready_target_before_accepting_network_block(self):
         for ready, expected_exit in [(False, 1), (True, 0)]:

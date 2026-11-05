@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 source "$(dirname "$0")/lib.sh"
 cluster_ready
-kubectl get node cp-01 wk-01 wk-02 >/dev/null
+lab_nodes
+kubectl get node "${LAB_NODES[@]}" >/dev/null
 need curl
 mkdir -p "$ROOT/.cache/calico"
 cd "$ROOT/.cache/calico"
