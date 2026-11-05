@@ -22,6 +22,10 @@ Phạm vi đã thực hiện: **source, công cụ và kiểm tra local** trên 
 | Quy trình nghiệm thu | [C1–C4](../../tests/security/README.md), [SVC04](../../tests/service/README.md), [OBS01](../../observability/README.md), [ma trận luật mạng](../../network/policies/README.md) |
 | Hồ sơ kết quả | [Mẫu evidence](templates/test-result.md), giữ trạng thái chưa chạy cho cloud |
 | Hướng dẫn cho TV1/TV2 | [Phiếu bàn giao](../tv3-handover.md), cách lấy branch TV3, bảng người nhận/đầu vào/mốc/ký nhận và cách chuyển source lên VM |
+| Chuẩn bị laptop | [Hướng dẫn laptop](../tv3-laptop.md), checker offline có log, Google Cloud CLI portable 592.0.0 với archive đã so SHA256 chính thức; `--version` chạy thành công |
+| Ma trận/đầu vào | [Ma trận C0–C4/C1b và các ca Service](../tv3-test-matrix.md), [checklist TV1/TV2](../tv3-access-checklist.md), đã điền thông số có trong repo và trạng thái công cụ của máy hiện tại |
+
+Theo yêu cầu hiện tại, bỏ qua slide; không đưa slide vào gói bàn giao đợt laptop. Người dùng đã đăng nhập bằng tài khoản riêng. Phép kiểm tra chỉ đọc ngày 05/11 xác nhận project/VM truy cập được, OS Login/Admin và IAP trên cp-01/wk-02 có hiệu lực, quyền start/stop ba VM không có. Lúc kiểm tra ba VM đang TERMINATED. Chưa import CA, sửa hosts, SSH, thay IAM hoặc khởi động/cài đặt lên cụm; chưa kiểm tra Kubernetes/Rancher trực tiếp bằng tài khoản TV3.
 
 ## Kiểm tra local đã chạy
 
@@ -52,8 +56,8 @@ Giới hạn công cụ được ghi rõ: timeout HTTP là thời gian socket kh
 
 | Test / công việc | Trạng thái thực tế trong phiên | Đầu vào để chạy tiếp |
 |---|---|---|
-| wk-02 chuẩn bị/join | Chưa chạy | TV1 giao VM, IAM/IAP, source và join command |
-| Calico / NET01 | Chưa chạy trên cụm | Ba node join, context đúng và quyền vận hành |
+| Tiếp nhận wk-02 | TV1 đã bootstrap theo bàn giao; TV3 chưa SSH kiểm tra trực tiếp | TV1 bật cụm theo lịch; xác nhận phiên SSH/context, không prepare/join lại |
+| Calico / NET01 | TV1 đã ghi nhận CNI/Service hoạt động; TV3 chưa chạy lại fixture hai chiều trên cụm | Node Ready, context đúng và phạm vi thử được thống nhất; không cài lại Calico |
 | Istio / Prometheus / Kiali | Chưa cài trong phiên | Mạng nền đạt, Helm và quyền quản trị phù hợp |
 | OBS01 | Chưa chạy trên ứng dụng | TV2 giao app/sidecar/route và request tạo luồng nội bộ |
 | SEC01–SEC04 | Chưa chạy trên ứng dụng | Hai nguồn thật, labels/ServiceAccount/API, baseline và chính sách đã thống nhất |

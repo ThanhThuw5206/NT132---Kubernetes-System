@@ -6,6 +6,8 @@ Source nền `17aaed9`; cập nhật **05/11/2026**. Mục tiêu là kiểm ch�
 
 Máy hiện tại đã có Python qua **uv**; lệnh `python` đang có thể trỏ tới shortcut Microsoft Store. Tại thư mục repo, dùng:
 
+Phần công cụ portable và cách chạy checker tổng hợp nằm tại [hướng dẫn laptop TV3](tv3-laptop.md). Chạy `uv run --offline --no-project python scripts/check-tv3-local.py` để lưu báo cáo kiểm tra local vào `.generated/`; lệnh này không đăng nhập hoặc gọi API project.
+
 ```powershell
 uv run --offline --no-project python -m unittest discover -s tests -v
 uv run --offline --no-project python scripts/tv3.py --help
@@ -15,39 +17,49 @@ Không chạy script cài node Linux từ PowerShell. Trên máy khác, `--offli
 
 Test HTTP local mở server loopback; test NET01 offline dùng kubectl giả trong thư mục tạm. Chúng không gọi cloud. Kiểm tra cú pháp Bash trong Git Bash: `for file in scripts/*.sh; do bash -n "$file" || exit; done`.
 
+Phần laptop hiện làm trước gồm: rà code/config, chạy test offline, soạn [ma trận nguồn–đích và test](tv3-test-matrix.md), điền [checklist đầu vào/quyền](tv3-access-checklist.md), chuẩn bị tài liệu và gói bàn giao. Chưa làm slide theo yêu cầu hiện tại. Không cần bật VM để làm các việc này. Các ô giá trị ứng dụng, quyền, log thật và ký nhận còn chờ TV1/TV2; không điền giả để coi đã hoàn thành cloud.
+
 Để nhận code đã commit, lấy branch `tv3/istio-network` theo [phiếu bàn giao](tv3-handover.md) và ghi commit đang dùng. Gói overlay local là phương án bổ sung khi có sửa đổi mới chưa commit; riêng `git archive HEAD` không chứa các sửa đổi đó.
 
 ## 2. Phân công, đầu vào và mốc nghiệm thu
 
 | Mốc | TV3 chủ trì | TV3 kiểm tra chéo / phối hợp | Người nhận và bằng chứng |
 |---|---|---|---|
-| M1 · 06/11 | `wk-02`, Calico, NET01; Istio nền; Prometheus/Kiali và OBS01 | TV1 giao VM/join/API; TV2 giao app/route/request. TV3 chạy lại IAM01, SVC02 và hỗ trợ Service/EndpointSlice | TV2 nhận mạng/mesh Ready trước deploy; TV1 tự mở graph và tạo request mới; log/ảnh/metric đúng thời điểm |
+| M1 · 06/11 | Tiếp nhận `wk-02`/Calico đang chạy, kiểm tra NET01; Istio nền; Prometheus/Kiali và OBS01 | TV1 giao quyền/context và trạng thái hiện tại; TV2 giao app baseline/route/request. TV3 chạy lại IAM01, SVC02 và hỗ trợ Service/EndpointSlice | Theo quy trình TV1: baseline app đạt trước tích hợp mesh; TV1 tự mở graph và tạo request mới; log/ảnh/metric đúng thời điểm |
 | M2 · 13/11 | Kiểm tra độc lập URL frontend từ ngoài VPC, đối chiếu Kiali; hỗ trợ chẩn đoán Pod → Service → NodePort → LB | TV2 sở hữu NodePort/route; TV1 sở hữu LB/Rancher. TV3 là người kiểm tra PUB01 | TV1 nhận URL/status/nội dung trang/graph; TV2 đối chiếu Service; không dùng port-forward làm bằng chứng public |
 | M3 · 20/11 | SEC03: NetworkPolicy riêng, DNS/endpoint, nguồn đúng/sai và phục hồi | TV2 chủ trì SEC01/SEC02; TV3 kiểm tra mTLS và thử lại; TV1 chủ trì tích hợp SEC04 | TV1 chạy lại SEC03; ghi rõ policy đang bật mỗi lượt C1–C4 |
 | M4 · 27/11 | SVC04 và hồ sơ chẩn đoán; chạy lại suite/đóng gói evidence | TV2 chủ trì thay Pod/scale SVC02/SVC03; TV3 theo dõi EndpointSlice/UID và gọi cùng DNS. Cả nhóm OPS01 | TV1 sửa selector; TV2 gọi lại thành công; người khác chạy lại từ hướng dẫn và ghi sai khác |
 
 TV1 vẫn sở hữu cloud/Rancher/LB; TV2 sở hữu ứng dụng/Service/route và xác nhận luật Istio. TV3 không cần chờ ứng dụng hoàn chỉnh để chuẩn bị mạng/mesh/hồ sơ, nhưng graph/policy nghiệm thu phải dùng luồng thật do TV2 bàn giao. Lịch là kế hoạch, không tự chứng minh mốc đã đạt.
 
-## 3. Chuẩn bị `wk-02`, mạng nền và mesh
+## 3. Khi chuyển sang cloud: tiếp nhận cụm hiện có, không bootstrap lại
 
-Nhận project/zone, quyền IAM/IAP, VM và join command riêng từ TV1; dùng cùng phiên bản source. Đọc [bảng Calico/CIDR](../cluster/calico/README.md) và [deploy-cloud.md](deploy-cloud.md), phần 4–6. Không tạo thêm `wk-02` nếu Terraform đã tạo. Trên **wk-02**, tại thư mục source:
+Phần này là hướng dẫn cho phiên cloud sau khi đủ đầu vào; chưa phải việc chạy trong buổi chuẩn bị laptop. Hoàn thành [checklist đầu vào/quyền](tv3-access-checklist.md), nhận project/zone, phiên SSH/kubectl/Helm và dùng cùng phiên bản source.
 
-Cập nhật TV1 tại `612e3b0` báo cụm/Service/Rancher đã hoạt động; xem [runbook bật/tắt lab](bat-tat-lab.md) và [hướng dẫn thêm thành viên](them-thanh-vien.md) để nhận quyền và trạng thái hiện tại trước khi chạy lại bootstrap. Worker có thể mang tên Node FQDN trên GCE; các script nhận diện bằng InternalIP và dùng nhãn `nt132.lab/worker` để đặt Pod thử, không yêu cầu reset worker để đổi tên.
+Cập nhật TV1 tại `612e3b0` báo cụm/Service/Rancher đã hoạt động. TV3 **tiếp nhận Calico đang chạy**, không chạy lại prepare, init/join/reset hoặc cài CNI. Xem [runbook bật/tắt lab](bat-tat-lab.md) và [hướng dẫn thêm thành viên](them-thanh-vien.md). Worker có thể mang tên Node FQDN trên GCE; script nhận diện bằng InternalIP và dùng nhãn `nt132.lab/worker`, không reset worker để đổi tên.
+
+TV1 bật cụm và xác nhận Ready. Khi được giao kiểm tra trên **wk-02**, chỉ đọc trạng thái hiện tại:
 
 ```bash
 hostname -s  # phải là wk-02; tên Node trong Kubernetes có thể là FQDN
-sudo bash scripts/01-prepare-node.sh
 sudo systemctl is-active containerd
 kubelet --version
-# Chạy sudo kubeadm join với token/hash thật do TV1 cấp qua kênh riêng.
 ```
 
-Sau khi cả hai worker đã join, TV1/TV3 thống nhất một người chạy Calico trên **cp-01**:
+Trong phiên kubectl có quyền do TV1 bố trí trên **cp-01**, đọc trạng thái mạng:
 
 ```bash
 kubectl config current-context
 kubectl get nodes -o wide
-bash scripts/03-install-calico.sh
+kubectl get tigerastatus
+kubectl -n kube-system get pods
+```
+
+Đối chiếu [bảng Calico/CIDR](../cluster/calico/README.md) với inventory thực. Script 01/02/03 và join chỉ dùng nếu cả nhóm chủ động dựng một lab mới theo [deploy-cloud.md](deploy-cloud.md); không dùng chúng như bước bắt đầu hằng ngày của cụm hiện có.
+
+Nếu thống nhất chạy lại NET01, đây là phép thử **có tạo fixture và gán label node**, không còn là thao tác chỉ đọc:
+
+```bash
 bash scripts/test-cross-node.sh
 ```
 
@@ -62,7 +74,7 @@ kubectl delete -f tests/service/network-check.yaml
 
 File gồm namespace `network-check`; không xóa nếu còn tài nguyên khác cần giữ trong đó. Client ngủ một giờ; nếu chạy lại sau khi Pod Completed, dọn đúng fixture rồi tạo lại. Giữ taint control plane.
 
-Khi mạng nền đạt và đã có Helm, tiếp tục trên **cp-01**:
+Theo quy trình TV1 mới: TV2 triển khai workload baseline và xác minh các thành phần gọi nhau được; TV1 review phiếu bàn giao. Khi đủ quyền, baseline và đã thống nhất phiên thao tác, TV3 cài mesh/observability trên **cp-01**:
 
 ```bash
 helm version
@@ -71,7 +83,7 @@ kubectl -n istio-system get deployments,svc,pods -o wide
 bash scripts/07-install-observability.sh
 ```
 
-Nếu chưa có Helm, phối hợp TV1 chạy `bash scripts/04-install-helm.sh`. Giao TV2 ngay namespace `istio-system`, tên Service gateway, port/targetPort/NodePort thật và trạng thái Istiod/gateway Ready. TV2 triển khai workload/route sau khi bật injection; không chờ hoàn tất mọi dashboard mới bàn giao. Thống nhất trước khi hai người sửa cùng gateway Service.
+Nếu chưa có Helm, phối hợp TV1 chuẩn bị Helm trong phiên cloud; laptop không cần cài Helm chỉ để soạn code. Giao TV2 namespace `istio-system`, tên Service gateway, port/targetPort/NodePort thật và trạng thái Istiod/gateway Ready. Với workload baseline đã có, phối hợp TV2 bật injection đúng namespace và rollout lại workload để nhận proxy, rồi tích hợp route và kiểm tra lại baseline trước policy. Không bật injection ở `kube-system`, `cattle-system` hoặc toàn cluster. Thống nhất trước khi hai người sửa cùng gateway Service.
 
 ## 4. Snapshot và nhận ứng dụng
 
@@ -92,9 +104,9 @@ TV2 điền [phiếu app](application-handover.md), chuẩn bị `config/applica
 python3 scripts/tv3.py render config/application.json
 ```
 
-Lệnh chỉ sinh file và in thư mục mới `.generated/tv3-*`; chưa apply. Dùng đúng thư mục vừa in. Không apply cả thư mục vì có `inputs.json` và hai trạng thái khác nhau của cùng Service thử. TV2 apply namespace injection, workload và route theo runbook cloud. Không mặc định Bookinfo trừ khi TV2 chọn ứng dụng đó.
+Lệnh chỉ sinh file và in thư mục mới `.generated/tv3-*`; chưa apply. Dùng đúng thư mục vừa in. Không apply cả thư mục vì có `inputs.json` và hai trạng thái khác nhau của cùng Service thử. TV2 apply namespace injection, workload và route theo runbook cloud; nếu workload đã chạy baseline trước khi có mesh, rollout lại đúng workload sau khi bật injection và xác minh proxy Ready. Không mặc định Bookinfo trừ khi TV2 chọn ứng dụng đó.
 
-TV3 tiếp tục theo [OBS01](../observability/README.md), [ma trận NetworkPolicy](../network/policies/README.md), [C1–C4/SEC03](../tests/security/README.md) và [SVC04](../tests/service/README.md). Khi so sánh lỗi, giữ nguyên nguồn/đích/path và ghi lớp duy nhất vừa thay đổi, baseline trước/sau và thao tác phục hồi.
+TV3 tiếp tục theo [ma trận test tổng hợp](tv3-test-matrix.md), [OBS01](../observability/README.md), [ma trận NetworkPolicy](../network/policies/README.md), [C1–C4/SEC03](../tests/security/README.md) và [SVC04](../tests/service/README.md). Khi so sánh lỗi, giữ nguyên nguồn/đích/path và ghi lớp duy nhất vừa thay đổi, baseline trước/sau và thao tác phục hồi. Ca client không proxy dưới STRICT cần quyền/nguồn đối chứng riêng; không dùng probe vốn yêu cầu proxy Ready để kết luận ca đó.
 
 ## 5. Việc kiểm tra chéo phải để lại kết quả
 
