@@ -33,7 +33,7 @@ Thông số ứng dụng nhập qua `config/application.json` theo file example.
 ## Tài liệu bắt đầu
 
 - [Triển khai cloud từng bước](docs/deploy-cloud.md)
-- [Bật/tắt lab mỗi buổi để tiết kiệm chi phí](docs/bat-tat-lab.md)
+- [Runbook hằng ngày: IAM, bật/tắt VM, Rancher và làm tiếp](docs/bat-tat-lab.md)
 - [Thêm TV2/TV3, phân quyền và bàn giao công việc](docs/them-thanh-vien.md)
 - [Kế hoạch tổng thể](docs/plan.md)
 - [Hướng dẫn TV1](docs/tv1-setup.md)

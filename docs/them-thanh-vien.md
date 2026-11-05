@@ -155,6 +155,8 @@ Cài Istio tạo CRD và tài nguyên cấp cluster, nên `Cluster Member` có t
 
 ## 6. Công việc TV1 còn lại
 
+Sau khi cấp quyền, cả nhóm dùng [runbook vận hành hằng ngày](bat-tat-lab.md) để bật/tắt VM, kiểm tra cluster, mở Rancher và tiếp tục đúng phần việc.
+
 TV1 không cần viết lại cụm. Các việc còn lại:
 
 1. Bật/tắt ba VM và theo dõi credit.
