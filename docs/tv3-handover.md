@@ -1,140 +1,105 @@
-# TV3 · Phiếu bàn giao cho cả nhóm
+# TV3 · Nhận source, đầu vào và bàn giao
 
-Ngày lập **05/11/2026**. Source nền `17aaed9`; nhánh bàn giao là `tv3/istio-network`. Tài liệu này hướng dẫn lấy mã và nhận việc, không phải biên bản thành viên đã ký nhận hoặc nghiệm thu cloud. Xem [trạng thái thực tế](evidence/TV3-status.md).
+Cập nhật **06/11/2026**. Nhánh bàn giao `tv3/istio-network`, source nền `17aaed9`, gồm phần tích hợp Bookinfo và bộ tài liệu TV3 đã gộp. Người nhận ghi commit thực tế sau khi lấy mã. Xem [trạng thái đã kiểm tra](evidence/TV3-status.md); file này là checklist nhận việc, chưa phải ký nhận hay nghiệm thu cloud.
 
-## 1. Nhóm đang nhận những gì?
+Thao tác laptop/cloud ở [runbook TV3](tv3-runbook.md); kỳ vọng, rollback và người chạy lại ở [ma trận test](tv3-test-matrix.md). TV1 giữ hạ tầng/Rancher/LB; TV2 giữ workload/Service/route và luật Istio; TV3 phụ trách mạng, mesh nền, quan sát, NetworkPolicy và bài selector.
 
-| Sản phẩm local | Dùng để làm gì? | Người nhận |
-|---|---|---|
-| Fixture/script NET01 hai chiều | Chứng minh Pod IP/ClusterIP/DNS xuyên worker; thu log/exit code | TV2 chạy lại, TV1 đối chiếu firewall nếu lỗi |
-| Calico values và bảng phiên bản/CIDR | Cài một CNI thống nhất, so source với runtime thật | TV1/TV3 trước cài cụm |
-| Script cài Istio/quan sát và snapshot | Chuẩn bị nền mesh/Prometheus/Kiali, đọc readiness/phiên bản | TV2 nhận gateway Ready để deploy app; TV1 mở lại dashboard |
-| Công cụ traffic/probe | Tạo request và ghi thời điểm/status; ghi nguồn/danh tính/DNS/policy/endpoint | TV1/TV2 chạy lại OBS01/ca quyền |
-| Renderer và Service thử selector | Tạo manifest theo thông số app, chẩn đoán SVC04 bằng Service riêng | TV1 sửa lỗi, TV2 gọi lại và kiểm tra Service gốc |
-| Snapshot Service–Pod–EndpointSlice | Ghi UID/ClusterIP/selector/ports và ánh xạ endpoint sang Pod Ready trước/sau restart/scale | TV2 chủ trì SVC02/SVC03, TV3 kiểm tra chéo |
-| Quy trình/mẫu evidence | C1–C4 riêng từng lớp, hoàn tác, kiểm tra chéo và đóng gói kết quả | Cả nhóm OPS01 |
+## 1. Nhận đúng source
 
-Danh sách đóng gói tường minh nằm tại `docs/tv3-package-files.txt`; đó là source overlay và các dependency cần thiết, không phải bộ ứng dụng đã chọn hoặc bằng chứng cloud. Khi công cụ thay đổi, xem `scripts/tv3.py --help` và runbook đi cùng đúng gói.
-
-## 2. Nhận mã từ branch TV3 trên GitHub
-
-Đây là cách nhận code đã commit của TV3. Lần đầu, clone sang thư mục riêng để giữ nguyên công việc hiện có của người nhận:
+**Code đã push:** clone sang thư mục riêng để giữ công việc hiện có của người nhận, rồi ghi commit vào inventory/evidence:
 
 ```powershell
 git clone --branch tv3/istio-network --single-branch https://github.com/ThanhThuw5206/NT132---Kubernetes-System.git NT132-TV3-review
 Set-Location NT132-TV3-review
-git branch --show-current
 git rev-parse HEAD
-uv run --offline --no-project python -m unittest discover -s tests -v
-uv run --offline --no-project python scripts/tv3.py --help
 ```
 
-Trên máy có Python thật dùng `python`, trên Ubuntu dùng `python3`; uv offline cần runtime đã cache. Ghi commit nhận được vào inventory/evidence. Sau khi nhóm thống nhất tích hợp, TV1/TV2 có thể merge branch này vào branch làm việc của mình; không cần giải nén ZIP lên code đã nhận đúng commit. Các ca cloud vẫn cần đầu vào và kiểm tra chéo ở mục 6.
+Thành viên chạy checker theo runbook trước khi tích hợp vào branch của mình. Branch trên GitHub chưa chứa sửa đổi local cho tới khi chúng được commit/push.
 
-## 3. Tùy chọn: chuyển thay đổi local chưa commit bằng ZIP
+**Sửa đổi chưa commit:** `git archive HEAD` chỉ lấy commit. Tạo gói source overlay bằng Python đang hoạt động theo runbook:
 
-Phần này dành cho các sửa đổi mới còn chưa commit hoặc khi cần chuyển source local qua kênh riêng. **`git archive HEAD` chỉ chứa commit**, sẽ bỏ file mới/sửa chưa commit. Từ laptop có code cần chuyển, chạy:
-
-```powershell
-uv run --offline --no-project python scripts/tv3.py package
+```text
+python scripts/tv3.py package
 ```
 
-Lệnh không cần `config/application.json`, không commit/push và không tự gửi file. Nó tạo thư mục `.generated/tv3-*` mới, chứa:
+Gói `.generated/tv3-*` có `tv3-overlay.zip`, `manifest.json` và `SHA256SUMS`; ZIP chứa thêm `tv3-overlay-manifest.json`. [Allowlist](tv3-package-files.txt) quy định source/dependency được lấy, bao gồm sửa đổi chưa commit. Lệnh không cần config vận hành, không tự commit, push hoặc gửi cho ai. Không chuyển SDK/cache đăng nhập, kubeconfig/token, SSH key, Terraform state hoặc `config/application.json` trong gói source.
 
-- `tv3-overlay.zip`: các file source được cho phép và `tv3-overlay-manifest.json` bên trong.
-- `manifest.json`: source nền và hash từng file trong gói để người nhận đối chiếu nội dung local.
-- `SHA256SUMS`: checksum của các artifact được công cụ liệt kê.
+Người nhận ZIP làm theo thứ tự sau, dùng các artifact của **cùng lần đóng gói**:
 
-Đọc danh sách file/manifest trước khi chuyển. Config vận hành thật, `.git`, kubeconfig/token/SSH key/Terraform state không thuộc gói. Giữ cấu hình app và thông tin truy cập riêng theo cách nhóm thống nhất. Việc tạo gói chỉ hoàn thành chuẩn bị bàn giao; người dùng chọn kênh và người nhận.
-
-## 4. Thành viên nhận gói ZIP trên máy khác
-
-Nhận đúng ZIP, manifest và SHA256SUMS của cùng một lần tạo gói. Trong PowerShell, đặt đường dẫn đến thư mục nhận thật:
+1. Đọc manifest/danh sách ZIP; so SHA256 ZIP và manifest với `SHA256SUMS`, xác nhận base `17aaed9`. Checksum đối chiếu nội dung, không tự chứng minh tác giả hoặc test cloud.
+2. Chuẩn bị repo sạch riêng ở base, không giải nén đè thư mục còn thay đổi. Ví dụ PowerShell:
 
 ```powershell
 $PackageDir = (Resolve-Path 'DUONG_DAN_THU_MUC_NHAN_GOI').Path
 Get-Content -LiteralPath (Join-Path $PackageDir 'SHA256SUMS')
 Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $PackageDir 'tv3-overlay.zip')
+Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $PackageDir 'manifest.json')
 Get-Content -LiteralPath (Join-Path $PackageDir 'manifest.json')
-```
-
-So hash ZIP với SHA256SUMS, kiểm tra source nền `17aaed9` và danh sách file đúng phần được bàn giao. Checksum giúp đối chiếu gói đã nhận; không tự chứng minh tác giả hay kết quả test cloud. Xem tên file bên trong bằng trình giải nén trước khi áp overlay.
-
-Chuẩn bị **repo sạch riêng** ở source nền; không ghi đè thư mục làm việc còn thay đổi của thành viên khác. Ví dụ lần nhận đầu:
-
-```powershell
 git clone --branch tv1/cloud-config https://github.com/ThanhThuw5206/NT132---Kubernetes-System.git NT132-TV3-review
 Set-Location NT132-TV3-review
 git switch -c tv3/review-local 17aaed9
 git status --short
-Expand-Archive -LiteralPath (Join-Path $PackageDir 'tv3-overlay.zip') -DestinationPath (Get-Location).Path -Force
-git status --short
-git diff --stat
 ```
 
-Chỉ giải nén sau khi đã xác nhận repo sạch/đúng base và danh sách ZIP. `-Force` áp có chủ đích source overlay lên source nền. Đọc `tv3-overlay-manifest.json` sau giải nén, đối chiếu hash/nội dung với manifest đi kèm và kiểm tra diff; không coi thông tin commit nền là commit chứa các thay đổi chưa lưu.
-
-Chạy lại test bằng uv đã có runtime hoặc Python >=3.10 trên máy nhận:
+3. Chỉ sau khi hash/danh sách đúng và repo sạch, áp overlay rồi kiểm tra. `python` dưới đây là Python >=3.10 thực; máy hiện tại dùng runtime trong runbook, Ubuntu dùng `python3`.
 
 ```powershell
-uv run --offline --no-project python -m unittest discover -s tests -v
-uv run --offline --no-project python scripts/tv3.py --help
-uv run --offline --no-project python scripts/tv3.py verify-package tv3-overlay-manifest.json
+Expand-Archive -LiteralPath (Join-Path $PackageDir 'tv3-overlay.zip') -DestinationPath (Get-Location).Path -Force
+git diff --stat
+python scripts/tv3.py verify-package tv3-overlay-manifest.json
+python -m unittest discover -s tests -v
 ```
 
-Nếu máy nhận chưa có uv/runtime, dùng Python thật hoặc chuẩn bị runtime trước; `--offline` không tự cài thứ chưa có. Không dùng lỗi Microsoft Store alias để kết luận bộ test hỏng.
+Đối chiếu `tv3-overlay-manifest.json` trong ZIP với manifest đi kèm; giữ manifest/hash và kết quả test cùng biên bản nhận. Commit nền không đại diện cho những file local chưa commit.
 
-## 5. Đưa source cho VM sau khi nhóm sẵn sàng
+Khi đưa source lên VM, TV1 dùng archive đúng commit hoặc chuyển chính gói overlay đã kiểm tra theo [deploy-cloud](deploy-cloud.md). Giữ cấu hình riêng của VM trước khi cập nhật. Với repo nguồn sạch đúng base, Ubuntu có thể xem/giải nén ZIP bằng `python3 -m zipfile -l` / `python3 -m zipfile -e`, rồi chạy `verify-package` và test như trên; không cần `unzip`. Ghi source/hash đang chạy trên các VM.
 
-TV1 lấy đúng commit từ branch `tv3/istio-network`, rồi đưa source đã commit lên VM bằng archive theo [deploy-cloud.md](deploy-cloud.md). Ghi cùng commit trên cả ba VM; không dùng riêng archive cũ của TV1 để chạy các công cụ TV3 mới.
+## 2. Đầu vào TV1 bàn giao
 
-Nếu dùng thêm sửa đổi local chưa commit, chuyển **cùng gói overlay đã kiểm tra** qua IAP/SSH hoặc cách nhóm đã chọn và giải nén vào thư mục source nền sạch, đúng phiên bản. Các lệnh ZIP dưới đây chỉ dành cho phương án overlay này:
+Điền **Đã nhận và kiểm tra / Chưa nhận / Bị chặn**, người giao và thời điểm vào biên bản cuối file. Trạng thái IAM/VM đã kiểm tra trước đây chỉ ghi tại [TV3-status](evidence/TV3-status.md); không suy quyền hoặc trạng thái hiện tại từ việc có hướng dẫn.
 
-Trên VM có Python3, có thể xem và giải nén ZIP bằng thư viện chuẩn, không cần cài `unzip`:
+| Đầu vào | Điều kiện TV3 cần nhận / phần còn chờ |
+|---|---|
+| Inventory và lịch phiên | Project `nt132-kubernetes-513805`, zone `asia-southeast1-a`, VM cp-01/wk-01/wk-02, IP nội bộ .10/.11/.12; xác nhận cụm Ready và người đang dùng lab. Tên Node có thể là FQDN. |
+| Google IAM và SSH/IAP | Tài khoản riêng, quyền đúng phạm vi; kiểm tra kết nối SSH/firewall/sudo thực tế. Có quyền start/stop vẫn cần phối hợp người đang dùng lab. |
+| Kubernetes/Helm | Context đúng và phiên có quyền cài CRD/resource mesh cấp cluster; quyền đọc policy app/root mesh, log, exec, port-forward; quyền debug/client riêng nếu cần. Chưa có phiên thực được xác nhận. |
+| Rancher | User riêng, cluster/project/role đúng; mật khẩu tạm qua kênh riêng. Cluster Member có thể chưa đủ cài Istio. |
+| CA, hostname, tunnel | Chỉ nhận `ca.crt` công khai, đối chiếu CA/hostname trước import; không nhận private key. Chốt hosts/port và người giữ port-forward để tránh trùng phiên. |
+| Thay đổi/rollback | Lịch cài Istio/Prometheus/Kiali, namespace được dùng, policy nền cần giữ, người sở hữu và trạng thái phải phục hồi. |
+| Frontend public, giai đoạn sau | URL/IP/cổng, nguồn cho phép, LB health/firewall cho PUB01; không cần để chuẩn bị local. |
 
-```bash
-python3 -m zipfile -l ~/tv3-overlay.zip
-# Sau khi kiểm tra danh sách và đúng thư mục source nền:
-python3 -m zipfile -e ~/tv3-overlay.zip ~/NT132---Kubernetes-System
-cd ~/NT132---Kubernetes-System
-python3 scripts/tv3.py verify-package tv3-overlay-manifest.json
-python3 -m unittest discover -s tests -v
-python3 scripts/tv3.py --help
-```
+Google IAM, Rancher và Kubernetes RBAC là ba lớp quyền khác nhau. OS Admin Login cho phép sudo nhưng tài khoản SSH mới chưa tự có kubeconfig của TV1. TV1 bố trí phiên quản trị phù hợp; không chép `admin.conf` ra laptop/Git để tiện dùng. TV3 tiếp nhận worker/Calico đang hoạt động, không init/join/reset hoặc cài CNI lại.
 
-Giữ manifest/hash gói cùng inventory và evidence để truy ra source đã chạy, kể cả khi bản source VM không có `.git`. Nếu trên VM còn thay đổi/cấu hình riêng, so sánh trước khi giải nén; không chép config vận hành vào gói source để tiện gửi.
+## 3. Đầu vào TV2 và thứ tự giao nhận
 
-## 6. Ai cần làm tiếp và ký nhận điều gì?
+Thiết kế Bookinfo đã có tại [apps/bookinfo](../apps/bookinfo/README.md): namespace `bookinfo`, entry `productpage:9080`, target `ratings:9080`, Pod TCP 9080; caller reviews-v2/SA bookinfo-reviews, đối chứng productpage-v1/SA bookinfo-productpage; website `/productpage`, API GET `/ratings/0`. Các giá trị này còn phải đối chiếu triển khai thật.
 
-| Bàn giao | TV3 cung cấp | Thành viên tiếp tục | Điều kiện nhận / mốc |
-|---|---|---|---|
-| TV1 → TV3 | Ghi rõ đầu vào còn chờ | TV1 giao VM, project/zone, quyền IAP/API, join riêng và CIDR/firewall | Xác minh `wk-02` và context thật trước bootstrap; M1 |
-| TV3 → TV2 | NET01 thực, namespace/Service gateway, cổng thật, Istiod/gateway Ready | TV2 bật injection, deploy app và route | TV2 chạy lại NET01, không chỉ đọc source; M1 |
-| TV2 → TV3 | [Phiếu app](application-handover.md) và baseline hai nguồn | TV2 cung cấp labels/ServiceAccount/API/ports/request; TV3 kiểm tra OBS01 | App có sidecar, request tạo luồng nội bộ thật; M1 |
-| TV3 → TV1 | Graph/metric cùng thời gian và cách mở lại | TV1 phát request mới và tự tìm cạnh | OBS01; không nghiệm thu từ ảnh cũ; M1 |
-| TV1/TV2 → TV3 | Frontend URL và app/gateway đã đạt | TV3 kiểm tra từ ngoài VPC, gửi status/nội dung/graph về TV1/TV2 | PUB01; tách bằng chứng public với port-forward; M2 |
-| TV2 → TV3 → TV1 | SEC01/SEC02 + phục hồi; SEC03 riêng + phục hồi | TV1 chạy lại luật mạng, chủ trì C4 tích hợp | Lưu policy từng lượt C1–C4 và rollback; M3 |
-| TV3 → TV1 → TV2 | Service thử selector sai, triệu chứng/bằng chứng | TV1 tự sửa; TV2 gọi lại cùng URL và kiểm tra Service gốc | SVC04; dọn riêng Service thử; M4 |
-| TV2 → TV3 | Kịch bản thay Pod/scale và replica gốc | TV3 đối chiếu UID/targetRef/EndpointSlice trước-sau, gọi cùng DNS | SVC02/SVC03, có phục hồi và ghi gián đoạn nếu có |
-| TV1 → TV3 | Danh tính viewer/quyền cần demo | TV3 đọc dashboard và kiểm tra `can-i`, không sửa workload thật | IAM01, quyền sửa phải bị từ chối |
-| Cả nhóm | Gói source/hash, hướng dẫn và evidence thật | Người khác chạy lại, ghi lỗi/sai khác và ký nhận | OPS01; khóa đúng source demo khi cả nhóm thống nhất |
+| TV2 bàn giao | Điều kiện nhận / dữ liệu runtime còn chờ |
+|---|---|
+| Baseline và nguồn workload | Source/image/tag/license có sẵn; còn kết quả deploy không proxy, DNS/HTTP/nội dung đúng và TV1 review. Ghi imageID/digest thực vào [inventory](../apps/bookinfo/service-inventory.md). |
+| Service/Pod/ports | Selector, labels, readiness/resources, Service UID/ClusterIP/port/targetPort, Deployment/replica gốc và EndpointSlice targetRef; ghi tên Pod/UID/IP/node thật. |
+| Hai nguồn trong mesh | Cùng namespace, proxy Ready; khác cả labels và ServiceAccount. Container app/debug đúng Pod có `curl` và `getent`; không exec trong istio-proxy thay nguồn. |
+| API/traffic và luồng hợp lệ | Request không đổi dữ liệu, response/status/nội dung mong đợi; liệt kê mọi nguồn hợp lệ vào target, ingress và metrics. Config tham chiếu đã render local, config vận hành đối chiếu runtime và giữ ngoài Git. |
+| Client ngoài mesh C1b | Quyền tạo client riêng, lượt thành công trước STRICT và cleanup; không tắt injection namespace đang dùng để tạo đối chứng. |
+| Policy và phục hồi | Policy app/root mesh/CNI đang có; C0/C1 hai nguồn, kết quả C2 và rollback trước TV3 thử C3; manifest/replica gốc cho restart/scale. |
 
-## 7. Mẫu ghi nhận bàn giao thực
+Điền chi tiết ở [phiếu app](application-handover.md); thực hiện theo [runbook TV2](tv2-runbook.md). Thứ tự chung:
 
-Sao chép cho từng lần giao, không tự điền là đã gửi/đã nhận:
+1. TV1 xác nhận cụm/quyền; TV3/TV2 NET01. TV2 deploy baseline không proxy rồi TV1 review.
+2. TV3 cài mesh/quan sát, giao gateway Ready/cổng thật; TV2 bật injection, rollout và route, kiểm tra baseline lần nữa.
+3. TV2 giao nguồn/Service/endpoint thật; TV3 chạy OBS01, TV1 tạo traffic mới và tìm lại graph/metric.
+4. TV2 C1/C2 và phục hồi → TV3 C3 riêng và phục hồi → TV1 chạy lại/C4. TV2 thay Pod/scale, TV3 chụp chéo SVC02/SVC03; SVC04 TV3 tạo Service riêng, TV1 sửa, TV2 gọi lại.
+5. TV1 giao frontend để TV3 kiểm tra PUB01; cả nhóm chạy lại OPS01, ghi sai khác và nguồn demo. Xem ma trận cho tiêu chí từng ca, không lấy test local thay kết quả cloud.
+
+## 4. Biên bản một lần nhận/bàn giao
 
 ```text
-Người giao / người nhận:
-Thời điểm và múi giờ:
-Source nền / hash ZIP / hash manifest:
-Đã kiểm tra danh sách file và diff:
-Đầu vào cloud/app đã nhận:
-Lệnh đã chạy và kết quả thực:
-Test cloud đã nghiệm thu / người chạy lại:
-Policy/trạng thái cluster hiện tại và rollback:
-Việc còn mở / người xử lý / người đang chờ:
-Link evidence / log / ảnh:
-Xác nhận người nhận:
+Người giao / người nhận / thời điểm và múi giờ:
+Branch/commit hoặc base + hash ZIP/manifest; đã so danh sách/hash/diff:
+Đầu vào nhận được và trạng thái Đã kiểm tra / Chưa nhận / Bị chặn:
+Context/namespace; người đang dùng lab; phạm vi thay đổi và rollback:
+Lệnh/kết quả thực; link evidence; người chạy lại và xác nhận:
+Policy/trạng thái sau buổi; lỗi còn mở / người xử lý / người đang chờ:
 ```
 
-Phần source/hướng dẫn TV3 được bàn giao qua branch; việc thành viên nhận và chạy lại cần được ghi riêng. Chưa có ký nhận hoặc nghiệm thu cloud trong phiên này. Dùng [mẫu test](evidence/templates/test-result.md) cho từng NET01/OBS01/SEC03/SVC04/PUB01 và các ca kiểm tra chéo.
+Không ghi token, mật khẩu, private key, kubeconfig hoặc email cá nhân vào biên bản trong repo. Kết quả từng ca dùng [mẫu evidence](evidence/templates/test-result.md); chỉ đánh dấu Đạt khi có kết quả thực, phục hồi và người khác chạy lại.

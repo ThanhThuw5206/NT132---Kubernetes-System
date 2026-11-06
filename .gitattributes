@@ -3,3 +3,5 @@
 *.yaml text eol=lf
 *.tf text eol=lf
 *.env text eol=lf
+# Preserve exact upstream bytes used by the Bookinfo source lock/checksums.
+apps/bookinfo/upstream/* -text

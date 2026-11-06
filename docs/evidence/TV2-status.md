@@ -1,29 +1,34 @@
-# Trạng thái công việc TV2 · 05/11/2026
+# Trạng thái phần ứng dụng TV2 · cập nhật local 06/11/2026
 
-Phạm vi phiên này: **chọn ứng dụng mẫu, chuẩn bị manifest và runbook trên laptop**. Source nền `tv3/istio-network` (`89f106d`); branch làm việc `tv2/kubernetes-service`. Ghi commit thực tế bằng `git rev-parse HEAD` khi lấy mã. Chưa deploy app, chưa áp policy trên cụm cloud trong phiên này.
+TV2 chọn Bookinfo và giao tài liệu/config tại `4377766` (từ TV3 `89f106d`). Đợt tích hợp sau đó trên laptop TV3 sửa config/hướng dẫn, thêm workload có nguồn/hash và công cụ offline cho cả nhóm. Các bổ sung này không có nghĩa TV2 đã triển khai app/nghiệm thu cloud; ghi commit/hash gói thật khi nhận source.
 
-**Cập nhật nhận từ nhóm:** ngày 05/11/2026 ba node v1.35.10 Ready, Pod IP/ClusterIP/DNS trả 200, Rancher thấy ba node Active; Istio/Kiali/app/policy **chưa** triển khai. Đây là trạng thái bàn giao trong repo, không phải nghiệm thu cloud mới của TV2.
+Theo ghi nhận TV1 05/11, ba node v1.35.10 Ready, Pod IP/ClusterIP/DNS 200, Rancher ba node Active. Đây là bàn giao cũ trong repo; đợt local này không kiểm tra lại VM/cụm, bật/tắt, SSH hoặc apply policy.
 
-## Đã chuẩn bị
+## Đã chuẩn bị local
 
-| Sản phẩm | File |
+| Sản phẩm | Tình trạng / nơi nhận |
 |---|---|
-| Ứng dụng đã chọn + nguồn/giấy phép | [apps/bookinfo/README.md](../../apps/bookinfo/README.md) — Bookinfo, release Istio 1.30.7, Apache-2.0 |
-| Config tích hợp tham chiếu | [apps/bookinfo/application.bookinfo.json](../../apps/bookinfo/application.bookinfo.json) — copy sang `config/application.json` khi deploy |
-| Bảng kê Service (điền khi deploy) | [apps/bookinfo/service-inventory.md](../../apps/bookinfo/service-inventory.md) |
-| Runbook thao tác từng bước | [docs/tv2-runbook.md](../tv2-runbook.md) |
+| App/nguồn/giấy phép | [Bookinfo README](../../apps/bookinfo/README.md), Istio 1.30.7, Apache-2.0 |
+| Workload có provenance/hash | [source-lock](../../apps/bookinfo/source-lock.json), [upstream](../../apps/bookinfo/upstream/); không cần thư mục full release trên VM |
+| Chuẩn bị workload | scripts/prepare-bookinfo.py xác minh source, sinh baseline injection disabled/workload/metadata; chưa apply |
+| Config mesh/route/policy | [application.bookinfo.json](../../apps/bookinfo/application.bookinfo.json): /ratings/0 cùng luồng website, route tường minh |
+| Baseline/mesh | [Runbook TV2](../tv2-runbook.md): baseline trước mesh theo TV1, sau đó injection/rollout/route/test riêng từng lớp |
+| Công cụ/readiness | curl + getent, debug cùng Pod/SA có quyền, app/proxy Ready kiểu thường và native |
+| Inventory/bàn giao | [Bảng Service](../../apps/bookinfo/service-inventory.md) tách thiết kế/tag nguồn khỏi UID/endpoint/imageID/kết quả runtime còn chờ |
+
+Kết quả checker gần nhất do TV3 ghi tại [TV3-status](TV3-status.md). Unit test/mock/hash/render local không thay nghiệm thu app/cloud.
 
 ## Chưa nghiệm thu cloud
 
-| Test / công việc | Trạng thái | Đầu vào để chạy tiếp |
+| Test / công việc | Trạng thái | Đầu vào để tiếp tục |
 |---|---|---|
-| wk-01 join | TV1 đã bootstrap theo bàn giao; TV2 chưa SSH kiểm tra trực tiếp | Context/phiên SSH thật; không prepare/join lại |
-| Deploy Bookinfo | Chưa chạy | TV3 báo Istiod/gateway Ready; thư mục release 1.30.7 trên cp-01 |
-| APP01 (/productpage có sao) | Chưa chạy | App có sidecar 2/2, route đã apply |
-| SVC01 | Chưa chạy | Service ratings có endpoint Ready |
-| SVC02 / SVC03 | Chưa chạy | App đã deploy; TV3 chụp chéo snapshot |
-| SEC01 / SEC02 | Chưa chạy | Hai nguồn thật, ServiceAccount/API, baseline STRICT |
-| NodePort → TV1 | Chưa chạy | Gateway route đạt; thử 30080 hai worker trước khi TV1 nối LB |
-| Phiếu bàn giao TV3 | Chưa điền | Giá trị thật sau deploy |
+| Tiếp nhận wk-01 | TV1 đã bootstrap theo bàn giao; TV2 chưa SSH kiểm tra trực tiếp đợt này | Context/SSH thật; không prepare/join lại |
+| Deploy baseline | Chưa chạy | Cụm/quyền Ready, output chuẩn bị xác minh; chưa cần Istio |
+| Review baseline | Chưa chạy | Website có sao, hai nguồn DNS/HTTP 200, endpoint/source/hash; TV1 review |
+| Injection/route/APP01 | Chưa chạy | TV3 mesh/gateway Ready sau baseline; app/proxy Ready; route/nội dung đúng |
+| SVC01–SVC03 | Chưa chạy | Service/Pod/EndpointSlice thật, replica gốc, lệnh/log phục hồi |
+| SEC01/SEC02 | Chưa chạy | Hai nguồn/công cụ/SA thật, baseline/quyền đọc policy; evidence mTLS/RBAC/rollback |
+| NodePort → TV1 | Chưa chạy | Gateway/route đạt, thử hai worker trước LB |
+| Runtime → TV3 | Chưa điền | UID/IP/SA/endpoint/imageID/context/request/kết quả và người chạy lại |
 
-Ứng dụng và project cloud không tự chọn thay TV1/TV3. Khi nhận đầu vào, chạy theo [runbook TV2](../tv2-runbook.md), lưu log thật và nhờ thành viên khác tái hiện trước khi đổi trạng thái sang Đạt. Không đưa Secret/token/kubeconfig vào bằng chứng.
+TV2 tiếp tục sở hữu workload/Service/route/luật Istio; TV3 nhận dữ liệu làm OBS01/NetworkPolicy/selector lab. Ca chưa chạy giữ Chưa chạy; thiếu quyền/đầu vào ghi Bị chặn và người xử lý, không tự điền số liệu để đóng bàn giao.

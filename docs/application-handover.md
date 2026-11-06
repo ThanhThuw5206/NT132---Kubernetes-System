@@ -2,6 +2,8 @@
 
 TV2 tự chọn mã nguồn hoặc ứng dụng phù hợp, kiểm tra giấy phép, ghim phiên bản và triển khai manifest trong apps/. TV1 dùng thông tin bàn giao để kiểm tra gateway và load balancer. TV3 dùng cùng thông tin để thiết lập quan sát và policy.
 
+**Thiết kế đã nhận và tích hợp local ngày 06/11/2026:** Bookinfo từ Istio `1.30.7`, namespace `bookinfo`, entry `productpage:9080`, caller `reviews-v2` / SA `bookinfo-reviews`, target `ratings:9080` / Deployment `ratings-v1`, Pod TCP 9080; website `/productpage`, API GET `/ratings/0`. Source/hash/giấy phép và cấu hình nằm trong [apps/bookinfo](../apps/bookinfo/README.md). Đây là thông số thiết kế; bảng nghiệm thu bên dưới vẫn chờ dữ liệu cloud thật.
+
 | Trường | TV2 điền trước khi tích hợp |
 |---|---|
 | Nguồn và phiên bản | URL repo, tag/commit, giấy phép, image/digest |
@@ -42,9 +44,10 @@ Ghi người bàn giao/người nhận, source/commit hoặc hash gói local, th
 
 ## Giao nhận theo thứ tự
 
-1. **TV3 → TV2:** mạng xuyên worker và Istiod/gateway Ready, namespace/Service gateway/cổng thật. TV2 mới triển khai workload có sidecar và route.
-2. **TV2 → TV3:** điền bảng trên, gửi đường dẫn manifest và request baseline thật; TV3 dựng OBS01 và chuẩn bị SEC03/SVC04.
-3. **TV2 → TV3 → TV1:** TV2 lưu SEC01/SEC02 và phục hồi baseline; TV3 chạy riêng SEC03 và phục hồi; TV1 tái hiện rồi chủ trì tích hợp SEC04.
-4. **TV3 → TV1/TV2:** tình huống selector sai để TV1 tự sửa, TV2 gọi lại; sau đó đóng gói evidence để cả nhóm chạy lại OPS01.
+1. **TV1/TV3 → TV2:** cụm/Calico hiện có, phiên đúng quyền và NET01. TV2 dùng workload baseline không injection, chứng minh Service/DNS và request nghiệp vụ rồi TV1 review; chưa cần chờ Istio.
+2. **TV3 → TV2:** cài Istio/gateway và quan sát sau baseline; giao namespace/Service gateway/cổng thật khi Ready. TV2 bật injection/rollout app, áp route rồi xác minh Pod/app/proxy Ready và baseline lần nữa.
+3. **TV2 → TV3:** điền bảng trên bằng dữ liệu runtime, nguồn thật và request; TV3 chạy OBS01 và chuẩn bị SEC03/SVC04.
+4. **TV2 → TV3 → TV1:** TV2 lưu SEC01/SEC02 và phục hồi baseline; TV3 chạy riêng SEC03 và phục hồi; TV1 tái hiện rồi chủ trì tích hợp SEC04.
+5. **TV3 → TV1/TV2:** tình huống selector sai để TV1 tự sửa, TV2 gọi lại; sau đó đóng gói evidence để cả nhóm chạy lại OPS01.
 
-Xem [phiếu bàn giao TV3](tv3-handover.md) cho cách nhận code chưa push, danh sách người nhận và tiêu chí nghiệm thu.
+Xem [phiếu bàn giao TV3](tv3-handover.md) cho cách lấy branch, chuyển thêm sửa đổi chưa commit nếu có, danh sách người nhận và tiêu chí nghiệm thu.

@@ -13,10 +13,12 @@ FIELDS = {
     "allowed_caller_labels", "allowed_service_account", "trust_domain",
     "allowed_http_methods", "allowed_http_paths", "permit_prometheus_scrape",
 }
+OPTIONAL_FIELDS = {"public_http_matches"}
 
 def validate(cfg):
-    if not isinstance(cfg, dict) or set(cfg) != FIELDS:
-        raise ValueError("Application config keys must exactly match application.example.json.")
+    if (not isinstance(cfg, dict) or not FIELDS <= set(cfg)
+            or set(cfg) - FIELDS - OPTIONAL_FIELDS):
+        raise ValueError("Use the required application.example.json keys; only public_http_matches is optional.")
     if "REPLACE_ME" in json.dumps(cfg):
         raise ValueError("TV2 must replace every REPLACE_ME before rendering.")
     dns_label = r"[a-z][a-z0-9-]{0,61}[a-z0-9]|[a-z]"
@@ -51,6 +53,22 @@ def validate(cfg):
     for value in [cfg["public_path_prefix"], *paths]:
         if not isinstance(value, str) or not value.startswith("/") or any(c.isspace() for c in value):
             raise ValueError("Paths must start with / and contain no whitespace.")
+    if "public_http_matches" in cfg:
+        matches = cfg["public_http_matches"]
+        if not isinstance(matches, list) or not matches:
+            raise ValueError("public_http_matches must be a nonempty list of exact/prefix URI matches.")
+        seen = set()
+        for match in matches:
+            if not isinstance(match, dict) or set(match) not in ({"exact"}, {"prefix"}):
+                raise ValueError("Each public HTTP match must contain exactly one exact or prefix key.")
+            mode, path = next(iter(match.items()))
+            if (not isinstance(path, str) or not path.startswith("/")
+                    or any(c.isspace() or ord(c) < 32 or ord(c) == 127 for c in path)
+                    or any(c in path for c in "?#\\*")):
+                raise ValueError("Public HTTP matches must be literal absolute paths without query, fragment or wildcard.")
+            if (mode, path) in seen:
+                raise ValueError("Duplicate public HTTP match.")
+            seen.add((mode, path))
     methods = cfg["allowed_http_methods"]
     if not isinstance(methods, list) or not methods or not set(methods) <= {"GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"}:
         raise ValueError("Specify explicit HTTP methods.")
@@ -64,6 +82,7 @@ def resources(cfg):
         return {"apiVersion": api, "kind": kind,
                 "metadata": {"name": name, "namespace": ns}, "spec": spec}
     selector = {"matchLabels": cfg["target_labels"]}
+    public_matches = cfg.get("public_http_matches", [{"prefix": cfg["public_path_prefix"]}])
     principal = cfg["trust_domain"] + "/ns/" + ns + "/sa/" + cfg["allowed_service_account"]
     rules = [{"from": [{"podSelector": {"matchLabels": cfg["allowed_caller_labels"]}}],
               "ports": [{"protocol": "TCP", "port": cfg["target_port"]}]}]
@@ -84,7 +103,7 @@ def resources(cfg):
         }),
         "route.json": obj("networking.istio.io/v1", "VirtualService", "application-route", {
             "hosts": ["*"], "gateways": ["application-gateway"],
-            "http": [{"match": [{"uri": {"prefix": cfg["public_path_prefix"]}}],
+            "http": [{"match": [{"uri": dict(match)} for match in public_matches],
                       "route": [{"destination": {"host": cfg["entry_service"] + "." + ns + ".svc.cluster.local",
                                                 "port": {"number": cfg["entry_service_port"]}}}]}],
         }),

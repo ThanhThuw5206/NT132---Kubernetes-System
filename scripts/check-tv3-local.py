@@ -40,6 +40,11 @@ def main():
               "scope": "Laptop validation only; mocks and loopback HTTP are not cloud acceptance",
               "python": sys.version.split()[0], "checks": []}
     report["checks"].append(run_check("unit-tests", [sys.executable, "-m", "unittest", "discover", "-s", "tests", "-v"], report_dir))
+    report["checks"].append(run_check("bookinfo-source", [sys.executable, "scripts/prepare-bookinfo.py",
+                                                        "--output", str(report_dir / "bookinfo-baseline")], report_dir))
+    report["checks"].append(run_check("bookinfo-render", [sys.executable, "scripts/tv3.py", "render",
+                                                        "apps/bookinfo/application.bookinfo.json",
+                                                        "--output", str(report_dir / "bookinfo-integration")], report_dir))
     bash = shutil.which("bash")
     if not bash and os.name == "nt":
         candidate = pathlib.Path(os.environ.get("ProgramFiles", "C:/Program Files")) / "Git/bin/bash.exe"

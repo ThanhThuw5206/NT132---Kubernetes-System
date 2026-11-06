@@ -1,23 +1,23 @@
 # TV3 · Ma trận kiểm thử và bằng chứng
 
-Soạn trên laptop ngày **05/11/2026** theo [phân công TV1](them-thanh-vien.md) và [kế hoạch](plan.md). **Các dòng dưới là kế hoạch, chưa phải kết quả cloud.** Điền giá trị thật từ [phiếu ứng dụng](application-handover.md) trước khi chạy. Dùng [mẫu kết quả](evidence/templates/test-result.md) cho từng lượt; giữ log lỗi và lượt phục hồi.
+Soạn trên laptop ngày **05/11/2026**, cập nhật Bookinfo **06/11/2026** theo [phân công TV1](them-thanh-vien.md) và [kế hoạch](plan.md). **Các dòng dưới là kế hoạch, chưa phải kết quả cloud.** Giá trị thiết kế đã có; điền Pod/UID/endpoint và kết quả thật từ [phiếu ứng dụng](application-handover.md) trước khi chạy. Dùng [mẫu kết quả](evidence/templates/test-result.md) cho từng lượt; giữ log lỗi và lượt phục hồi.
 
 ## 1. Tên dùng trong ma trận
 
 | Token | TV2/TV1 xác nhận trước khi thử |
 |---|---|
-| `APP_NAMESPACE` | Namespace ứng dụng riêng; không dùng namespace hệ thống |
-| `ENTRY_SERVICE:ENTRY_SERVICE_PORT` | Service nhận request từ gateway và cổng Service |
-| `TARGET_SERVICE:TARGET_SERVICE_PORT` | Service nội bộ để thử; DNS đầy đủ `TARGET_SERVICE.APP_NAMESPACE.svc.cluster.local` |
-| `TARGET_PORT` | Cổng Pod thực nhận traffic; có thể khác cổng Service |
-| `APP_PATH` / `TEST_PATH` | Path ngoài gateway tạo luồng nội bộ / API GET cụ thể trên target |
-| `ALLOWED_POD` | Pod nguồn trong mesh, đúng `allowed_caller_labels` và `allowed_service_account` |
-| `CONTROL_POD` | Pod nguồn trong cùng namespace, cũng có proxy Ready nhưng khác cả caller labels và ServiceAccount |
+| `APP_NAMESPACE` | Thiết kế: `bookinfo`; đối chiếu namespace triển khai thật |
+| `ENTRY_SERVICE:ENTRY_SERVICE_PORT` | `productpage:9080` nhận request từ gateway |
+| `TARGET_SERVICE:TARGET_SERVICE_PORT` | `ratings:9080`; DNS `ratings.bookinfo.svc.cluster.local` |
+| `TARGET_PORT` | TCP `9080` ở Pod ratings; xác minh runtime trước apply NetworkPolicy |
+| `APP_PATH` / `TEST_PATH` | GET `/productpage` tạo luồng reviews → ratings; GET `/ratings/0` thử trực tiếp target |
+| `ALLOWED_POD` | Pod `reviews-v2`, labels `app=reviews,version=v2`, SA `bookinfo-reviews`; tên/UID/IP thật chờ TV2 |
+| `CONTROL_POD` | Pod `productpage-v1`, labels `app=productpage,version=v1`, SA `bookinfo-productpage`; tên/UID/IP thật chờ TV2 |
 | `NON_MESH_CLIENT` | Client riêng không có proxy, chỉ tạo khi TV1/TV2 thống nhất quyền và phạm vi thử |
 | `TARGET_POD` | Pod Ready được selector Service chọn; ghi tên, UID, IP, node thật |
 | `PUBLIC_IP:30080` | Frontend LB do TV1 bàn giao sau khi app qua gateway đã đạt |
 
-Nguồn thử chạy bằng app/debug container có `curl` và công cụ DNS phù hợp. Không exec trong `istio-proxy` để thay nguồn ứng dụng. Không tự chọn Bookinfo hoặc tự đoán Service/Deployment từ tên placeholder. `config/application.json` thật giữ ngoài Git theo `.gitignore`; bảng này chỉ chứa quy ước và kỳ vọng.
+TV2 đã chọn Bookinfo tại `4377766`; config local đã đồng bộ API `/ratings/0` với website. Nguồn thử chạy bằng app/debug container có cả `curl` và `getent`, kiểm tra theo [runbook TV2](tv2-runbook.md). Không exec trong `istio-proxy` để thay nguồn ứng dụng. `config/application.json` thật giữ ngoài Git theo `.gitignore`; bảng này chỉ chứa thiết kế và kỳ vọng, chưa điền Pod/endpoint/digest giả.
 
 ## 2. Cổng kiểm tra trước khi đổi policy
 
@@ -25,6 +25,8 @@ Nguồn thử chạy bằng app/debug container có `curl` và công cụ DNS ph
 2. Theo quy trình TV1, TV2 bàn giao baseline ứng dụng gọi nhau được trước khi TV3 tích hợp mesh. Sau injection/route, kiểm tra lại app/Service/EndpointSlice trước các ca quyền.
 3. Đọc policy ứng dụng, root namespace mesh và các luật mạng có thể liên quan. Baseline C0 phải được xác minh, không xóa luật không thuộc bài thử để tạo baseline giả.
 4. Ghi thời gian, source/commit hoặc hash gói, context, namespace, nguồn/đích, danh tính/nhãn, DNS, Service UID/ClusterIP và endpoint Ready. Chỉ đổi một lớp ở C2/C3.
+
+Kiểm tra baseline trước mesh là một bước riêng, **chưa phải C0** vì chưa có proxy. Dùng workload sinh bởi `scripts/prepare-bookinfo.py` và namespace injection disabled theo runbook TV2; chỉ dùng `tv3.py probe` từ C0 sau khi proxy Ready. Sau rollout, lấy lại tên/UID Pod nguồn và tạo lại debug container nếu cần.
 
 ## 3. C0–C4: cùng một request, đổi riêng lớp đang thử
 

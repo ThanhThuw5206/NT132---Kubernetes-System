@@ -1,348 +1,243 @@
-# TV2 · Runbook triển khai Kubernetes Service (Bookinfo)
+# TV2 · Bookinfo, Kubernetes Service và bàn giao TV3
 
-Bạn là **Thành viên 2**: quản lý `wk-01`, chọn ứng dụng mẫu và phụ trách trọng tâm đồ án — Kubernetes Service, DNS, selector, EndpointSlice, route tại gateway và luật phân quyền HTTP của Istio. Ứng dụng đã chốt là **Bookinfo** (xem [apps/bookinfo](../apps/bookinfo/README.md)).
+Cập nhật **06/11/2026** sau khi nhận Bookinfo tại `4377766` và sửa tích hợp trên laptop. Phần local đã có source ghim phiên bản, công cụ sinh workload/config và hướng dẫn kiểm tra. Các lệnh Kubernetes, Helm, SSH và test cloud bên dưới **chưa chạy trong đợt chuẩn bị này**.
 
-Tài liệu này là phần việc TV2 trong [deploy-cloud.md](deploy-cloud.md) (mục 9) và [kế hoạch tổng thể](plan.md) (mục 3.2), gom theo đúng thứ tự thao tác. Quy ước khối lệnh: `bash` chạy **trong SSH vào VM** (cp-01 hoặc wk-01), thư mục `~/NT132---Kubernetes-System`; `powershell` chạy trên **laptop Windows**; khối `bash (Cloud Shell)` chạy ở **Google Cloud Shell**.
+TV2 sở hữu workload, Service/route, SVC01–03 và luật Istio SEC01/SEC02. TV3 sở hữu mạng/mesh nền, Prometheus/Kiali, NetworkPolicy và selector lab. TV1 điều phối hạ tầng, quyền, Rancher và frontend public. Theo bàn giao 05/11, ba node/Calico/Rancher đã hoạt động; tiếp nhận cụm hiện có, không prepare/init/join/reset lại.
 
----
+## 1. Thứ tự chung và nơi chạy
 
-## 0. Bối cảnh — TV2 ở đâu trong luồng
+Theo [TV1 §9](them-thanh-vien.md): **cụm Ready/NET01 → Bookinfo baseline không proxy → TV1 review → TV3 cài Istio/quan sát → TV2 bật injection/rollout/route → kiểm tra lại → từng lớp policy và phục hồi**. TV2 chứng minh Service trước Istio; không chờ gateway để deploy baseline.
 
-Trạng thái ngày 05/11/2026 (theo [TV3-status](evidence/TV3-status.md) và [deploy-cloud §15](deploy-cloud.md)): ba node v1.35.10 Ready, Calico/CoreDNS/DNS hoạt động, Rancher v2.15.3 thấy đủ ba node Active. **Istio, Prometheus/Kiali, ứng dụng và policy chưa được triển khai.** Đó là phần việc tuần này.
-
-Thứ tự phụ thuộc bạn cần nhớ:
-
-1. **TV3 → TV2:** TV3 cài Istiod + ingress gateway và báo "gateway Ready" + tên namespace/Service/cổng gateway. Bạn **chưa** deploy app được khi chưa có sidecar injector.
-2. **TV2 (bạn):** bật injection cho namespace `bookinfo`, deploy Bookinfo, cấu hình route, chứng minh Service (SVC01/SVC02/SVC03), xác nhận luật Istio (SEC01/SEC02).
-3. **TV2 → TV1:** bàn giao NodePort 30080 đã thử trên cả hai worker để TV1 nối cloud LB.
-4. **TV2 → TV3:** điền [phiếu bàn giao app](application-handover.md) để TV3 chạy OBS01/SEC03/SVC04.
-
-Bạn **không** chạy Terraform, firewall, LB hay vòng đời VM (việc của TV1); **không** cài Calico/Istio nền hay NetworkPolicy lớp mạng (việc của TV3). Bạn sở hữu: manifest ứng dụng trong `apps/`, Service/route, và xác nhận AuthorizationPolicy/PeerAuthentication.
-
----
-
-## 1. Chuẩn bị laptop và nhận quyền (một lần)
-
-### 1.1. Công cụ trên laptop Windows
-
-Cài: **Git**, **Google Cloud CLI (gcloud)**, trình duyệt. Không cần VM local. Kiểm tra:
-
-```powershell
-git --version
-gcloud --version
-```
-
-### 1.2. Nhận quyền Google Cloud từ TV1
-
-TV1 cấp cho email Google của bạn ba role trên project `nt132-kubernetes-513805`: **Compute Viewer**, **Compute OS Admin Login**, **IAP-secured Tunnel User** (xem [bat-tat-lab §0](bat-tat-lab.md)). Sau khi được cấp, đăng nhập và tự kiểm tra SSH được vào worker của mình:
-
-```powershell
-gcloud auth login
-gcloud config set project nt132-kubernetes-513805
-gcloud compute ssh wk-01 --project=nt132-kubernetes-513805 --zone=asia-southeast1-a --tunnel-through-iap
-```
-
-Nếu IAP báo 403 → thiếu role; nếu timeout → VM chưa bật (nhờ TV1 bật) hoặc firewall. Không tự mở SSH ra Internet.
-
-### 1.3. Lấy đúng branch làm việc của bạn
-
-Branch của bạn là `tv2/kubernetes-service`, tạo từ branch bàn giao TV3 `tv3/istio-network` (đã gồm hạ tầng TV1 + Istio/mạng TV3 + renderer). Trên laptop:
-
-```powershell
-git clone https://github.com/ThanhThuw5206/NT132---Kubernetes-System.git
-cd NT132---Kubernetes-System
-git fetch origin
-git switch tv2/kubernetes-service
-git rev-parse HEAD   # ghi commit này vào inventory/evidence
-```
-
-Giữ kubeconfig, token, private key **ngoài Git**. Chỉ commit manifest mẫu có placeholder.
-
----
-
-## 2. Ngày 1 · Dựng wk-01 và join cụm
-
-> Nếu TV1 đã bootstrap đủ ba node (trạng thái 05/11) thì **không** join lại. Mục này dùng khi dựng lab mới hoặc wk-01 chưa join. Khi bật/tắt máy giữa các buổi, theo [runbook hằng ngày](bat-tat-lab.md), **không** init/join lại.
-
-### 2.1. Chuẩn hóa node (trên wk-01)
-
-TV1 đã gửi inventory (subnet, IP `10.20.0.11` cho wk-01, zone). SSH vào wk-01 rồi:
-
-```bash
-cd ~/NT132---Kubernetes-System
-hostname
-sudo bash scripts/01-prepare-node.sh
-sudo systemctl is-active containerd
-kubelet --version
-```
-
-Script tắt swap, nạp module kernel, bật IP forwarding, cài đúng phiên bản trong `config/versions.env` và apt-hold. Kubelet có thể chưa ổn định trước khi join — bình thường, không reset.
-
-### 2.2. Join vào control plane
-
-TV1 cấp lệnh join (token + CA hash) **qua kênh riêng**. Trên wk-01 chạy đúng lệnh đó với `sudo` ở đầu:
-
-```bash
-sudo kubeadm join 10.20.0.10:6443 --token <TV1_CAP> --discovery-token-ca-cert-hash sha256:<TV1_CAP>
-```
-
-Không tự bịa token. Token hết hạn thì xin TV1 tạo mới. Sau join, nhờ TV1/bạn kiểm tra trên cp-01: `kubectl get nodes -o wide` phải thấy wk-01 (tên node trên GCE có thể là `wk-01.<zone>.c.<project>.internal` — không phải lỗi). Node NotReady trước khi TV3 cài Calico là dự kiến.
-
-### 2.3. Chọn ứng dụng và ghi nguồn gốc
-
-Ứng dụng đã chốt là Bookinfo. Việc cần làm: tải gói release Istio `1.30.7` để có `samples/bookinfo`, và điền nguồn/giấy phép/tag image thực vào [apps/bookinfo/README.md](../apps/bookinfo/README.md) và [service-inventory.md](../apps/bookinfo/service-inventory.md). (Tải gói và cài istioctl do TV3 chủ trì ở bước Istio; bạn dùng chung thư mục release trên cp-01.)
-
----
-
-## 3. Ngày 2 · Kiểm chứng Service xuyên node (NET01) cùng TV3
-
-TV3 chủ trì NET01 bằng [fixture network-check](../tests/service/network-check.yaml) và [test-cross-node.sh](../scripts/test-cross-node.sh). Phần của bạn: đặt HTTP server/client ở đúng hai worker và đối chiếu kết quả gọi theo **IP Pod** và theo **DNS Service**. Trên cp-01:
-
-```bash
-bash scripts/test-cross-node.sh
-kubectl -n network-check get pods -o wide
-kubectl -n network-check get svc,endpointslice
-```
-
-Cả hai cách gọi phải HTTP 200 và hai Pod nằm **khác node**. Nếu IP chạy nhưng DNS lỗi → kiểm tra CoreDNS/EndpointSlice (không sửa firewall cloud vội). Dọn sau khi lưu bằng chứng:
-
-```bash
-kubectl delete -f tests/service/network-check.yaml
-```
-
-Đây là probe hạ tầng, **không** phải website đồ án. Ghi kết quả vào NET01 (TV3 chủ trì, bạn kiểm tra chéo).
-
-**Nhận bàn giao gateway từ TV3** trước khi sang ngày 3: TV3 báo `istio-system` có Istiod + ingress gateway Ready, Service gateway là NodePort, cổng HTTP 30080. Kiểm tra nhanh trên cp-01:
-
-```bash
-kubectl -n istio-system get deploy,svc,pods -o wide
-```
-
----
-
-## 4. Ngày 3 · Deploy Bookinfo và cấu hình route
-
-Toàn bộ mục này chạy trên **cp-01** (nơi có kubeconfig quản trị của TV1 và thư mục release Istio). Làm trong phiên có TV1 giám sát; không sửa namespace hệ thống.
-
-### 4.1. Tạo config tích hợp từ bản tham chiếu Bookinfo
-
-```bash
-cd ~/NT132---Kubernetes-System
-cp apps/bookinfo/application.bookinfo.json config/application.json
-python3 scripts/render-application.py config/application.json
-```
-
-`config/application.json` bị `.gitignore` (file vận hành). `render-application.py` kiểm tra đầu vào rồi **in ra một thư mục riêng** `./.generated/application-<mã>`. Gán đúng thư mục vừa in:
-
-```bash
-export GEN="$(python3 scripts/render-application.py config/application.json)"
-echo "$GEN"
-ls "$GEN"   # namespace.json gateway.json route.json mtls.json authorization.json network-policy.json inputs.json
-```
-
-> Đừng `kubectl apply -f "$GEN"` cả thư mục: có `inputs.json` không phải resource, và các policy phải áp **từng bước** để có đối chứng. Áp từng file theo đúng thứ tự dưới.
-
-### 4.2. Tạo namespace đã bật injection, rồi deploy Bookinfo
-
-```bash
-kubectl apply -f "$GEN/namespace.json"
-kubectl get ns bookinfo --show-labels    # phải có istio-injection=enabled
-```
-
-Áp manifest Bookinfo từ samples của release `1.30.7` (thư mục istio đã giải nén trên cp-01, ví dụ `~/istio-1.30.7`). Vì injection đã bật trước khi tạo Pod, sidecar được inject ngay:
-
-```bash
-ISTIO_DIR=~/istio-1.30.7
-kubectl apply -n bookinfo -f "$ISTIO_DIR/samples/bookinfo/platform/kube/bookinfo.yaml"
-# Giữ reviews-v2 cho cạnh reviews -> ratings ổn định:
-kubectl -n bookinfo scale deploy/reviews-v1 deploy/reviews-v3 --replicas=0
-kubectl -n bookinfo get deploy,pods,svc -o wide
-```
-
-Chờ từng Pod nghiệp vụ `READY 2/2` (app container + istio-proxy). Ghi tag/digest image thực vào [service-inventory.md](../apps/bookinfo/service-inventory.md):
-
-```bash
-kubectl -n bookinfo get pods -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.containers[*].image}{"\n"}{end}'
-```
-
-### 4.3. Áp Gateway + VirtualService và kiểm tra website
-
-```bash
-kubectl apply -f "$GEN/gateway.json"
-kubectl apply -f "$GEN/route.json"
-kubectl -n bookinfo get pods,svc,endpointslice
-```
-
-TV3/TV1 đang giữ port-forward gateway (`bash scripts/09-port-forward.sh app` → localhost:8080). Trên cp-01, với port-forward đang mở:
-
-```bash
-curl -i http://127.0.0.1:8080/productpage | head -40
-```
-
-Phải ra HTTP 200 và HTML trang sách. **Kiểm tra cả nội dung**: trang phải hiện điểm sao (reviews-v2 gọi được ratings); HTTP 200 của HTML vẫn có thể kèm lỗi reviews/ratings. Nếu 404 → so Host/path/gateway selector/VirtualService; chưa có route thì 404 là bình thường.
-
-### 4.4. SVC01 — bảng kê Service
-
-Điền [service-inventory.md](../apps/bookinfo/service-inventory.md) bằng dữ liệu thật: port/targetPort, selector, EndpointSlice Ready/targetRef của từng Service, đặc biệt `ratings`:
-
-```bash
-kubectl -n bookinfo get svc ratings -o yaml
-kubectl -n bookinfo get pods -l app=ratings -o custom-columns=NAME:.metadata.name,UID:.metadata.uid,IP:.status.podIP,NODE:.spec.nodeName
-kubectl -n bookinfo get endpointslice -l kubernetes.io/service-name=ratings -o yaml
-```
-
-**SVC01 đạt** khi ratings có ít nhất một endpoint Ready, nhãn và targetRef khớp Pod đang Ready.
-
----
-
-## 5. Ngày 4 · Thí nghiệm Service và luật phân quyền
-
-### 5.1. SVC02 — thay Pod, tên Service giữ nguyên
-
-Mục tiêu: chứng minh client dùng **cùng tên `ratings`** vẫn gọi được sau khi Pod ratings bị thay, nhờ Service + EndpointSlice; phân biệt Pod bằng **UID** (IP có thể tái dùng).
-
-```bash
-# 1) Trước: lưu UID/ClusterIP/endpoint và gọi thử từ nguồn hợp lệ (reviews-v2)
-kubectl -n bookinfo get svc ratings -o jsonpath='{.spec.clusterIP}{"\n"}'
-kubectl -n bookinfo get pods -l app=ratings -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.metadata.uid}{"\n"}{end}'
-REVIEWS=$(kubectl -n bookinfo get pod -l app=reviews,version=v2 -o jsonpath='{.items[0].metadata.name}')
-kubectl -n bookinfo exec "$REVIEWS" -c reviews -- curl -sS -o /dev/null -w '%{http_code}\n' http://ratings:9080/ratings/1
-
-# 2) Thay đúng Pod ratings do Deployment quản lý, chờ Ready
-kubectl -n bookinfo rollout restart deploy/ratings-v1
-kubectl -n bookinfo rollout status deploy/ratings-v1
-
-# 3) Sau: UID mới, endpoint trỏ Pod mới, gọi lại cùng tên vẫn 200
-kubectl -n bookinfo get pods -l app=ratings -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.metadata.uid}{"\n"}{end}'
-kubectl -n bookinfo get endpointslice -l kubernetes.io/service-name=ratings -o yaml
-kubectl -n bookinfo exec "$REVIEWS" -c reviews -- curl -sS -o /dev/null -w '%{http_code}\n' http://ratings:9080/ratings/1
-```
-
-Ghi DNS/ClusterIP/Service-UID **không đổi**, UID Pod **đổi**, HTTP 200 trước/sau. TV3 chụp chéo bằng `python3 scripts/tv3.py service-snapshot ...` (xem [tests/service](../tests/service/README.md)). Chỉ một replica có thể có khoảng gián đoạn ngắn — ghi lại thay vì bỏ qua.
-
-### 5.2. SVC03 — một tên, nhiều backend (scale)
-
-```bash
-kubectl -n bookinfo get deploy ratings-v1 -o jsonpath='{.spec.replicas}{"\n"}'   # lưu số gốc
-kubectl -n bookinfo scale deploy/ratings-v1 --replicas=2
-kubectl -n bookinfo rollout status deploy/ratings-v1
-kubectl -n bookinfo get endpointslice -l kubernetes.io/service-name=ratings -o wide
-# ... đối chiếu 2 targetRef với 2 Pod Ready, gọi lại cùng tên ...
-kubectl -n bookinfo scale deploy/ratings-v1 --replicas=1     # trả về số gốc
-```
-
-EndpointSlice phải phản ánh đủ tập Pod Ready sau scale. **Không** kết luận tải chia đều chỉ từ vài response giống nhau. Bàn giao TV3 ba trạng thái: trước scale / sau scale / sau phục hồi.
-
-### 5.3. SEC01 — baseline mTLS STRICT
-
-Đọc ServiceAccount thật trước:
-
-```bash
-kubectl -n bookinfo get deploy reviews-v2 -o jsonpath='{.spec.template.spec.serviceAccountName}{"\n"}'     # bookinfo-reviews
-kubectl -n bookinfo get deploy productpage-v1 -o jsonpath='{.spec.template.spec.serviceAccountName}{"\n"}' # bookinfo-productpage
-```
-
-Áp PeerAuthentication STRICT cho ratings; **cả hai** nguồn trong mesh vẫn phải 200:
-
-```bash
-kubectl apply -f "$GEN/mtls.json"
-PP=$(kubectl -n bookinfo get pod -l app=productpage -o jsonpath='{.items[0].metadata.name}')
-kubectl -n bookinfo exec "$REVIEWS" -c reviews        -- curl -sS -o /dev/null -w '%{http_code}\n' http://ratings:9080/ratings/1
-kubectl -n bookinfo exec "$PP"      -c productpage    -- curl -sS -o /dev/null -w '%{http_code}\n' http://ratings:9080/ratings/1
-```
-
-Mỗi nguồn gọi 3 lần, lưu mã 200 và bằng chứng mTLS (`connection_security_policy`). Client **không** sidecar vào ratings STRICT phải bị từ chối.
-
-### 5.4. SEC02 — AuthorizationPolicy theo danh tính
-
-```bash
-kubectl apply -f "$GEN/authorization.json"
-# reviews (bookinfo-reviews) GET /ratings/1  -> 200
-kubectl -n bookinfo exec "$REVIEWS" -c reviews     -- curl -sS -o /dev/null -w '%{http_code}\n' http://ratings:9080/ratings/1
-# productpage (bookinfo-productpage) gọi thẳng   -> 403
-kubectl -n bookinfo exec "$PP"      -c productpage -- curl -sS -o /dev/null -w '%{http_code}\n' http://ratings:9080/ratings/1
-# log RBAC tại proxy đích
-kubectl -n bookinfo logs "$(kubectl -n bookinfo get pod -l app=ratings -o jsonpath='{.items[0].metadata.name}')" -c istio-proxy --tail=40
-```
-
-Kỳ vọng: reviews **200**, productpage **403** với dấu vết RBAC denied tại Envoy của ratings. Sau khi lưu bằng chứng, **gỡ đúng luật và phục hồi baseline** trước khi TV3 chạy SEC03 (NetworkPolicy):
-
-```bash
-kubectl delete -f "$GEN/authorization.json" --ignore-not-found
-kubectl -n bookinfo exec "$REVIEWS" -c reviews     -- curl -sS -o /dev/null -w '%{http_code}\n' http://ratings:9080/ratings/1  # 200
-kubectl -n bookinfo exec "$PP"      -c productpage -- curl -sS -o /dev/null -w '%{http_code}\n' http://ratings:9080/ratings/1  # 200 trở lại
-```
-
-Giữ nguyên PeerAuthentication STRICT xuyên suốt C1–C4. Ghi SEC01/SEC02 bằng [mẫu evidence](evidence/templates/test-result.md). Đừng dùng một Pod curl mới với ServiceAccount mặc định rồi kết luận danh tính reviews bị chặn.
-
-### 5.5. Bàn giao NodePort cho TV1 (giai đoạn B)
-
-Service gateway đã là NodePort 30080 (xem [mesh/istio/gateway-values.yaml](../mesh/istio/gateway-values.yaml)). Nhiệm vụ của bạn: thử `/productpage` qua IP riêng của **từng worker** từ cp-01/client cùng VPC:
-
-```bash
-curl -i http://10.20.0.11:30080/productpage | head -5   # wk-01
-curl -i http://10.20.0.12:30080/productpage | head -5   # wk-02
-```
-
-`externalTrafficPolicy: Cluster` cho phép worker chuyển tới gateway Pod ở worker khác, nên cả hai IP đều phải trả trang có sao. Ghi IP worker, giờ thử, mã HTTP, có/không có sao rồi **giao TV1** để nối cloud LB. Nếu một URL lỗi → gửi TV3 endpoint/route cần kiểm tra trước khi TV1 động vào LB.
-
-### 5.6. Điền phiếu bàn giao cho TV3
-
-Điền [application-handover.md](application-handover.md) (namespace, entry/caller/target service, ports, labels, ServiceAccount, API path, luồng hợp lệ, nguồn đối chứng bị chặn, lệnh tạo traffic). TV3 cần phiếu này để dựng OBS01 và chuẩn bị SEC03/SVC04. SVC04 (selector sai) do TV3 tạo, TV1 sửa, **bạn gọi lại cùng URL để xác nhận HTTP 200** sau khi sửa.
-
----
-
-## 6. Ngày 5 · Demo (phần nói 2 phút của TV2)
-
-Mở YAML của `ratings`, chỉ `port`, `targetPort`, `selector`; đối chiếu địa chỉ backend trong EndpointSlice với Pod thật. Cho thấy cùng tên `ratings` vẫn gọi được sau khi Pod mới Ready; nếu IP tái dùng thì dùng **UID** để phân biệt. Câu chuyển tiếp cho TV3: "Service `ratings` và backend đang nhận lưu lượng — đây là nơi request đi vào."
-
-Lệnh mở sẵn trước khi trình chiếu (mỗi port-forward một terminal):
-
-```bash
-kubectl -n bookinfo get endpointslice -l kubernetes.io/service-name=ratings -o wide
-bash scripts/09-port-forward.sh app     # localhost:8080 -> /productpage
-```
-
----
-
-## 7. Checklist nghiệm thu phần TV2
-
-| ID | Đạt khi | Chủ trì / kiểm tra chéo |
+| Việc | Nơi làm | Điều kiện hoàn tất |
 |---|---|---|
-| SVC01 | ratings có ≥1 endpoint Ready đúng nhãn/targetRef | TV2 / TV1 |
-| SVC02 | Thay Pod ratings, cùng tên vẫn 200, UID Pod mới chứng minh | TV2 / TV3 |
-| SVC03 | EndpointSlice phản ánh tập Pod sau scale, gọi cùng tên được | TV2 / TV3 |
-| APP01 | `/productpage` qua gateway có sách+review+sao, Pod 2/2 Ready | TV2 / TV1 |
-| SEC01 | Hai nguồn 200 khi chỉ STRICT, có bằng chứng mTLS | TV2 / TV3 |
-| SEC02 | reviews 200, productpage 403 + log RBAC; đã phục hồi baseline | TV2 / TV1 |
+| Kiểm tra source/hash, sinh manifest, đọc policy | Laptop, không cần bật VM | Checker local đạt, output mới và danh sách file rõ ràng |
+| App baseline, Service/EndpointSlice | Phiên quản trị trên cp-01 | HTTP nội bộ đúng, TV1 review; chưa injection/policy |
+| Istio/gateway/Prometheus/Kiali | cp-01, TV3 chủ trì | Nền Ready, bàn giao gateway Service/cổng/quyền/context |
+| Injection, route, SVC/SEC, evidence | cp-01, TV2/TV3 phối hợp | Pod/app/proxy Ready, kiểm thử/phục hồi có log thật |
+| NodePort/LB | Trong VPC rồi laptop ngoài VPC | TV2 thử NodePort; TV1 giao LB; tunnel không thay PUB01 |
 
-Chỉ đánh dấu **Đạt** khi có lệnh đã dùng + kết quả quan sát + một thành viên khác chạy lại được. Ca chưa chạy để **Chưa chạy**, lỗi môi trường ghi **Bị chặn** kèm bước khắc phục. Không dùng ảnh thay cho kết quả âm tính của policy.
+Khối `powershell` chạy trên laptop tại repo; `bash` chạy **trong SSH đã có quyền Kubernetes trên cp-01**, không phải Cloud Shell. SSH/IAP và lịch bật/tắt theo [runbook hằng ngày](bat-tat-lab.md); tài khoản SSH mới không tự có kubeconfig quản trị. Không chép admin.conf, token hoặc cache gcloud giữa các máy. Dùng một terminal SSH riêng cho triển khai/test; các lệnh có `|| exit 1` sẽ đóng terminal đó khi lỗi để dừng chuỗi phụ thuộc. Giữ port-forward trong terminal khác; sau lỗi đọc kết quả và trạng thái lab trước khi mở lại phiên tiếp tục.
 
----
+## 2. Chuẩn bị trên laptop
 
-## 8. Xử lý lỗi nhanh (phần TV2)
+Lấy cùng source tích hợp TV3 mà nhóm bàn giao, ghi `git rev-parse HEAD` và đọc diff local. Config thiết kế tại [apps/bookinfo](../apps/bookinfo/README.md); không cần `~/istio-1.30.7` để lấy workload nữa.
 
-| Triệu chứng | Kiểm tra trước |
-|---|---|
-| Pod Bookinfo chỉ 1/2 Ready (thiếu sidecar) | Namespace có `istio-injection=enabled` **trước** khi tạo Pod? Nếu áp label sau, `kubectl -n bookinfo rollout restart deploy` để inject lại |
-| Service không có endpoint Ready | selector vs nhãn Pod, readinessProbe, `targetPort` đúng cổng app (9080) |
-| `/productpage` 404 | Gateway selector `istio=ingressgateway`, host/path của VirtualService, route đã apply chưa |
-| Trang 200 nhưng không có sao | reviews gọi ratings lỗi: xem reviews-v2 còn chạy, ratings Ready, policy chưa chặn nhầm |
-| Luôn 200 dù đã áp AuthorizationPolicy | Đúng namespace/selector đích? Nguồn có proxy SYNCED? principal đúng `bookinfo-reviews`? `istioctl proxy-status` |
-| productpage vẫn 200 khi đã muốn chặn | Bạn đang exec đúng container app (không phải istio-proxy) và đúng ServiceAccount? |
-
-Tham khảo chẩn đoán đầy đủ ở [deploy-cloud §13](deploy-cloud.md) và [plan §19](plan.md).
-
----
-
-## 9. Git — làm việc trên branch TV2
+Laptop hiện tại có Python SDK portable chạy được checker; uv/Python 3.15.2 gặp Windows Application Control chặn DLL. Dùng:
 
 ```powershell
-git switch tv2/kubernetes-service
-git add apps/bookinfo docs/tv2-runbook.md docs/evidence/TV2-status.md apps/bookinfo/service-inventory.md
-git diff --cached        # kiểm tra đúng file, KHÔNG có kubeconfig/token/application.json
-git commit -m "Add TV2 Bookinfo service lab runbook and manifests"
-git push -u origin tv2/kubernetes-service
+$Python = '.\.cache\gcloud-592.0.0\google-cloud-sdk\platform\bundledpython\python.exe'
+& $Python scripts/check-tv3-local.py
+& $Python scripts/prepare-bookinfo.py --check
+& $Python scripts/prepare-bookinfo.py
+& $Python scripts/tv3.py render apps/bookinfo/application.bookinfo.json
 ```
 
-Không commit `config/application.json` (đã trong `.gitignore`), kubeconfig, token, private key hay nội dung Secret. Khi tích hợp, mở Pull Request từ `tv2/kubernetes-service` để TV1 review; TV1 tạo namespace/quyền và lưu bằng chứng.
+Máy khác dùng Python >=3.10 hoạt động bình thường; không nhận SDK/cache đăng nhập của máy này. `prepare-bookinfo.py` chỉ đọc source/hash và sinh thư mục mới `.generated/bookinfo-*`:
+
+- `namespace-baseline.json`: namespace Bookinfo, injection **disabled** cho baseline.
+- `workloads.json`: Kubernetes List của Service/ServiceAccount/Deployment, giữ reviews-v2 chạy, reviews-v1/v3 bằng 0; có probes/tài nguyên lab.
+- `preparation.json`: nguồn/hash, image/cấu hình chuẩn bị; **không phải resource để apply**.
+
+Renderer tích hợp sinh namespace bật injection, Gateway/VirtualService và từng policy riêng. Không apply nguyên thư mục output vì có metadata và các policy cần thử độc lập. Công cụ local không gọi cloud hoặc deploy.
+
+## 3. Phiên cloud sau này: tiếp nhận cụm và app baseline
+
+Đặt context thật TV1 bàn giao; `TEN_CONTEXT_LAB` là ô điền:
+
+```bash
+set -o pipefail
+cd ~/NT132---Kubernetes-System || exit 1
+kubectl config get-contexts || exit 1
+export CTX=TEN_CONTEXT_LAB
+kubectl --context "$CTX" get --raw=/readyz || exit 1
+kubectl --context "$CTX" get nodes -o wide || exit 1
+kubectl --context "$CTX" -n kube-system get pods || exit 1
+```
+
+TV1 xác nhận ba node Ready/quyền thực hiện. TV3/TV2 chạy NET01 khi thống nhất phạm vi: script có tạo fixture/gán label node, không chỉ đọc. Các script cài đặt dùng current-context; trước khi chạy đối chiếu `kubectl config current-context` đúng `$CTX`, không đổi context của phiên đang phục vụ người khác.
+
+Nếu namespace bookinfo đã có workload/policy của lượt khác, lưu inventory/thống nhất baseline trước; không tắt injection hoặc ghi đè trạng thái đang dùng. Với lần triển khai đầu được bố trí:
+
+```bash
+BOOKINFO_GEN="$(python3 scripts/prepare-bookinfo.py)" || exit 1
+export BOOKINFO_GEN
+printf '%s\n' "$BOOKINFO_GEN"
+kubectl --context "$CTX" apply -f "$BOOKINFO_GEN/namespace-baseline.json" || exit 1
+kubectl --context "$CTX" apply -f "$BOOKINFO_GEN/workloads.json" || exit 1
+for deployment in details-v1 ratings-v1 reviews-v2 productpage-v1; do
+  kubectl --context "$CTX" -n bookinfo rollout status "deployment/$deployment" --timeout=300s || exit 1
+done
+kubectl --context "$CTX" -n bookinfo get pods -o json | python3 scripts/check-bookinfo-pods.py --baseline || exit 1
+kubectl --context "$CTX" -n bookinfo get deploy,pods,svc,endpointslice -o wide
+```
+
+Mỗi rollout phải thành công; checker baseline cần đủ bốn app Ready, không proxy. Đối chiếu Service selector/ports và EndpointSlice. Có thể xem website bằng port-forward **Service productpage** trong terminal riêng trên cp-01:
+
+```bash
+kubectl --context "$CTX" -n bookinfo port-forward svc/productpage 9080:9080 --address=127.0.0.1
+```
+
+Tại terminal khác: `curl -fsS http://127.0.0.1:9080/productpage`, kiểm tra sách/review/sao, không chỉ HTTP 200. Baseline còn cần hai nguồn gọi trực tiếp ratings theo mục 4; port-forward một mình chưa chứng minh DNS Service. TV1 review baseline/[inventory](../apps/bookinfo/service-inventory.md) trước mesh.
+
+## 4. Hai nguồn HTTP/DNS đúng danh tính
+
+Lấy Pod thật sau mỗi rollout; tên/UID có thể đổi:
+
+```bash
+REVIEWS=$(kubectl --context "$CTX" -n bookinfo get pod -l app=reviews,version=v2 -o jsonpath='{.items[0].metadata.name}') || exit 1
+PP=$(kubectl --context "$CTX" -n bookinfo get pod -l app=productpage -o jsonpath='{.items[0].metadata.name}') || exit 1
+REVIEWS_CONTAINER=reviews
+PP_CONTAINER=productpage
+kubectl --context "$CTX" -n bookinfo get pod "$REVIEWS" "$PP" -o custom-columns=NAME:.metadata.name,UID:.metadata.uid,SA:.spec.serviceAccountName,IP:.status.podIP,NODE:.spec.nodeName
+```
+
+Thử app container trước; cần cả curl và getent. Ví dụ reviews:
+
+```bash
+SRC="$REVIEWS"
+SRC_CONTAINER="$REVIEWS_CONTAINER"
+kubectl --context "$CTX" -n bookinfo exec "$SRC" -c "$SRC_CONTAINER" -- sh -c 'command -v curl && command -v getent && test "$(id -u)" != 1337'
+```
+
+Nếu thiếu lệnh/shell, dùng debug container trong **chính Pod đó**, theo quyền TV1 cấp. Kiểm tra quyền, không tự đổi RBAC:
+
+```bash
+kubectl --context "$CTX" auth can-i update pods/ephemeralcontainers -n bookinfo
+kubectl --context "$CTX" auth can-i patch pods/ephemeralcontainers -n bookinfo
+kubectl --context "$CTX" auth can-i create pods/exec -n bookinfo
+```
+
+Chỉ tạo khi đủ quyền và có lịch thử. Image dùng phiên bản `nicolaka/netshoot:v0.14`, không latest; vẫn phải xác minh công cụ/UID và ghi imageID thực. [Dockerfile nguồn](https://raw.githubusercontent.com/nicolaka/netshoot/v0.14/Dockerfile) không thay kiểm tra runtime:
+
+```bash
+PROBE_CONTAINER="tv3-debug-$(date +%s%N)"
+kubectl --context "$CTX" -n bookinfo debug "$SRC" --attach=false --container="$PROBE_CONTAINER" --image=nicolaka/netshoot:v0.14 --profile=general -- sleep 3600 || exit 1
+DEBUG_RUNNING=''
+for ((attempt=0; attempt<60; attempt++)); do
+  DEBUG_RUNNING=$(kubectl --request-timeout=5s --context "$CTX" -n bookinfo get pod "$SRC" -o "jsonpath={.status.ephemeralContainerStatuses[?(@.name==\"$PROBE_CONTAINER\")].state.running.startedAt}") || exit 1
+  [ -n "$DEBUG_RUNNING" ] && break
+  sleep 2
+done
+if [ -z "$DEBUG_RUNNING" ]; then
+  printf '%s\n' 'Debug container did not become Running after 60 checks; inspect image pull and Pod events before retrying.' >&2
+  exit 1
+fi
+kubectl --context "$CTX" -n bookinfo exec "$SRC" -c "$PROBE_CONTAINER" -- sh -c 'command -v curl && command -v getent && test "$(id -u)" != 1337' || exit 1
+SRC_CONTAINER="$PROBE_CONTAINER"
+if [ "$SRC" = "$REVIEWS" ]; then
+  REVIEWS_CONTAINER="$SRC_CONTAINER"
+elif [ "$SRC" = "$PP" ]; then
+  PP_CONTAINER="$SRC_CONTAINER"
+fi
+```
+
+Lặp với `SRC="$PP"`, `SRC_CONTAINER=productpage`; nếu cần debug mới thì dùng tên mới và lưu `PP_CONTAINER="$SRC_CONTAINER"`. Nếu app container đã đủ lệnh thì giữ tên app gốc. Không exec trong istio-proxy, không dùng `--copy-to` hoặc Pod mới với SA mặc định thay nguồn. Debug cùng Pod giữ network/labels/SA, không cần chia sẻ process namespace. Không dùng UID 1337 (UID proxy có thể được bỏ qua interception) hoặc profile privileged.
+
+Ephemeral container tự kết thúc sau một giờ; entry còn trong Pod tới khi Pod được thay, không thể xóa riêng entry. TV2 thay Pod trong lượt rollout có kế hoạch sau khi lưu evidence. Sau rollout thêm proxy phải chọn lại Pod/UID và chuẩn bị lại công cụ; debug cũ không chuyển sang Pod mới.
+
+Baseline trước mesh và các lượt phục hồi dùng cùng DNS/path:
+
+```bash
+kubectl --context "$CTX" -n bookinfo exec "$REVIEWS" -c "$REVIEWS_CONTAINER" -- getent hosts ratings.bookinfo.svc.cluster.local
+kubectl --context "$CTX" -n bookinfo exec "$REVIEWS" -c "$REVIEWS_CONTAINER" -- curl --noproxy '*' -sS --max-time 10 -o /dev/null -w '%{http_code}\n' http://ratings.bookinfo.svc.cluster.local:9080/ratings/0
+kubectl --context "$CTX" -n bookinfo exec "$PP" -c "$PP_CONTAINER" -- getent hosts ratings.bookinfo.svc.cluster.local
+kubectl --context "$CTX" -n bookinfo exec "$PP" -c "$PP_CONTAINER" -- curl --noproxy '*' -sS --max-time 10 -o /dev/null -w '%{http_code}\n' http://ratings.bookinfo.svc.cluster.local:9080/ratings/0
+```
+
+Hai nguồn phải 200 khi chưa hạn chế. Lưu cả body JSON có ratings, DNS/exit code, UID/SA và endpoint Ready; bỏ `-o /dev/null` để lấy body khi cần. **Không dùng tv3.py probe trước mesh**: probe yêu cầu proxy Ready cho C1–C4. C1b không proxy cũng dùng lệnh riêng và đối chứng trước STRICT.
+
+## 5. Sau baseline: mesh, injection và route
+
+TV3 cài Istio/gateway/Prometheus/Kiali theo [runbook TV3](tv3-runbook.md), bàn giao istio-system, Service istio-ingressgateway, HTTP 80/NodePort 30080, Istiod/gateway Ready và quyền đọc policy app/root mesh. Workload vendored đủ để deploy app; istioctl chỉ là công cụ chẩn đoán nếu được chuẩn bị riêng đúng phiên bản, không phải dependency renderer/Helm.
+
+Nếu config/application.json đã có, so sánh trước khi thay. Với lần đầu:
+
+```bash
+cp apps/bookinfo/application.bookinfo.json config/application.json || exit 1
+GEN="$(python3 scripts/tv3.py render config/application.json)" || exit 1
+export GEN
+kubectl --context "$CTX" apply -f "$GEN/namespace.json" || exit 1
+for deployment in details-v1 ratings-v1 reviews-v2 productpage-v1; do
+  kubectl --context "$CTX" -n bookinfo rollout restart "deployment/$deployment" || exit 1
+  kubectl --context "$CTX" -n bookinfo rollout status "deployment/$deployment" --timeout=300s || exit 1
+done
+kubectl --context "$CTX" -n bookinfo get pods -o json | python3 scripts/check-bookinfo-pods.py || exit 1
+kubectl --context "$CTX" apply -f "$GEN/gateway.json" || exit 1
+kubectl --context "$CTX" apply -f "$GEN/route.json" || exit 1
+```
+
+Checker đọc JSON stdin, không gọi API: kiểm tra đủ bốn app/Pod Ready và proxy Ready. Không lấy cột `READY 2/2` làm điều kiện cố định: proxy thường ở spec.containers/status.containerStatuses; native sidecar ở spec.initContainers có restartPolicy Always và status.initContainerStatuses. Dừng lượt triển khai nếu rollout/checker trả lỗi, chưa áp route hoặc policy kế tiếp. Có thể lưu JSON Pod để làm evidence và chạy lại checker offline. Chọn lại nguồn/công cụ theo mục 4, lặp DNS/HTTP hai nguồn đều 200.
+
+Mở gateway ở terminal riêng:
+
+```bash
+kubectl --context "$CTX" -n istio-system port-forward svc/istio-ingressgateway 8080:80 --address=127.0.0.1
+```
+
+Terminal cp-01 khác kiểm tra `/productpage` có sách/review/sao; assets, login/logout và API đã route theo config. Route gateway không tự cho principal productpage gọi thẳng ratings sau SEC02; cạnh hợp lệ là reviews-v2 → ratings. Không chỉ nhìn HTTP 200 của HTML rồi kết luận website đạt.
+
+## 6. Service và policy: từng lớp có đối chứng/rollback
+
+TV2 điền [bảng Service](../apps/bookinfo/service-inventory.md) từ dữ liệu thực. SVC01 cần selector/port/targetPort khớp Pod Ready và EndpointSlice targetRef. SVC02/SVC03 chạy khi baseline đạt, chưa bật luật hạn chế nếu chưa thống nhất:
+
+```bash
+python3 scripts/tv3.py service-snapshot config/application.json --context "$CTX" || exit 1
+# SVC02: lưu UID/ClusterIP/endpoint rồi thay ratings, chờ Ready và gọi lại cùng DNS.
+kubectl --context "$CTX" -n bookinfo rollout restart deployment/ratings-v1 || exit 1
+kubectl --context "$CTX" -n bookinfo rollout status deployment/ratings-v1 --timeout=300s || exit 1
+python3 scripts/tv3.py service-snapshot config/application.json --context "$CTX" || exit 1
+# SVC03: đọc/lưu replica gốc, không mặc định số thực tế là 1.
+kubectl --context "$CTX" -n bookinfo get deployment ratings-v1 -o jsonpath='{.spec.replicas}{"\n"}'
+```
+
+SVC02: UID Pod đổi, UID/ClusterIP Service giữ nguyên, HTTP phục hồi; ghi gián đoạn nếu có. SVC03: lưu replica gốc, scale ratings lên 2/chờ rollout/snapshot/gọi lại, trả đúng replica gốc rồi snapshot/gọi lần ba. Đối chiếu toàn bộ endpoint Ready với Pod UID; không suy ra chia tải đều từ vài body giống nhau. Theo [hướng dẫn Service](../tests/service/README.md), TV2 chịu trách nhiệm các thay đổi/rollback workload.
+
+Trước SEC01, ghi SA thật, endpoint, policy namespace app/root mesh. Theo [ma trận C0–C4](tv3-test-matrix.md):
+
+```bash
+# C1 / SEC01: chỉ STRICT; hai nguồn trong mesh vẫn phải 200.
+kubectl --context "$CTX" apply -f "$GEN/mtls.json" || exit 1
+python3 scripts/tv3.py probe config/application.json --context "$CTX" --pod "$REVIEWS" --container "$REVIEWS_CONTAINER" --path /ratings/0 --expect 200 --phase C1-reviews || exit 1
+python3 scripts/tv3.py probe config/application.json --context "$CTX" --pod "$PP" --container "$PP_CONTAINER" --path /ratings/0 --expect 200 --phase C1-productpage || exit 1
+# C2 / SEC02: chỉ thêm luật danh tính/API.
+kubectl --context "$CTX" apply -f "$GEN/authorization.json" || exit 1
+python3 scripts/tv3.py probe config/application.json --context "$CTX" --pod "$REVIEWS" --container "$REVIEWS_CONTAINER" --path /ratings/0 --expect 200 --phase C2-reviews || exit 1
+python3 scripts/tv3.py probe config/application.json --context "$CTX" --pod "$PP" --container "$PP_CONTAINER" --path /ratings/0 --expect 403 --phase C2-productpage || exit 1
+```
+
+Lưu bằng chứng mTLS đúng cặp nguồn/đích, không chỉ YAML STRICT. Lưu log RBAC của proxy ratings khi nguồn đối chứng 403; có thể cần cấu hình access log phù hợp, không suy luận từ việc mặc định chưa có dòng log. C1b cần client không proxy đã được cấp quyền và baseline trước STRICT; không mặc định từ chối là HTTP 403.
+
+Sau C2 gỡ **riêng luật của lượt thử**, giữ STRICT, hai nguồn phải trở lại 200:
+
+```bash
+kubectl --context "$CTX" delete -f "$GEN/authorization.json" || exit 1
+python3 scripts/tv3.py probe config/application.json --context "$CTX" --pod "$REVIEWS" --container "$REVIEWS_CONTAINER" --path /ratings/0 --expect 200 --phase C2-recovered-reviews || exit 1
+python3 scripts/tv3.py probe config/application.json --context "$CTX" --pod "$PP" --container "$PP_CONTAINER" --path /ratings/0 --expect 200 --phase C2-recovered-productpage || exit 1
+```
+
+Không ghi đè/xóa policy có sẵn của người khác để tạo baseline. TV3 tiếp tục C3 NetworkPolicy riêng/phục hồi; C4 kết hợp sau khi ca riêng đạt. Website còn sao dưới C2/C4 vì reviews GET /ratings/0 được phép. SVC04 dùng Service riêng do TV3 tạo, TV1 sửa/TV2 gọi lại; không sửa selector ratings thật để mô phỏng lỗi.
+
+## 7. Bàn giao và nghiệm thu
+
+TV2 thử NodePort từ cp-01/client trong VPC trên **hai worker** rồi giao TV1:
+
+```bash
+curl --noproxy '*' -fsS --max-time 15 http://10.20.0.11:30080/productpage
+curl --noproxy '*' -fsS --max-time 15 http://10.20.0.12:30080/productpage
+```
+
+Ghi HTTP/nội dung có sao/giờ/IP thật; TV1 xử lý LB/frontend. Port-forward không thay bằng chứng ngoài VPC. TV2 điền [phiếu app](application-handover.md); TV3 chạy OBS01/kiểm tra chéo.
+
+| Ca | Đạt khi | Chủ trì / chạy lại |
+|---|---|---|
+| Baseline trước mesh | Hai nguồn DNS/HTTP 200, website có sao, endpoint Ready; chưa proxy/policy | TV2 / TV1 |
+| APP01 | Website qua gateway có sách/review/sao, app/proxy Ready, route demo hoạt động | TV2 / TV1 |
+| SVC01 | Selector/ports/EndpointSlice targetRef khớp Pod Ready | TV2 / TV1 |
+| SVC02 | Pod UID đổi, cùng DNS phục hồi, Service UID/ClusterIP không đổi | TV2 / TV3 |
+| SVC03 | Endpoint phản ánh đủ Pod Ready sau scale/rollback, gọi cùng DNS được | TV2 / TV3 |
+| SEC01 | Hai nguồn trong mesh 200 với STRICT và bằng chứng mTLS; C1b ghi riêng | TV2 / TV3 |
+| SEC02 | Reviews 200, productpage gọi thẳng bị 403/RBAC; website vẫn sao; phục hồi hai nguồn 200 | TV2 / TV1 |
+
+Chỉ ghi Đạt khi có lệnh/log thật, phục hồi và người khác chạy lại. Pod UID/IP/endpoint/imageID/context/giờ còn chờ nếu chưa chạy. [Mẫu evidence](evidence/templates/test-result.md) tách ảnh demo khỏi kết quả thật.
+
+Nhóm nhận phần tích hợp từ nhánh TV3, ghi đúng commit/gói theo [phiếu bàn giao](tv3-handover.md). Không switch/commit/push chỉ vì ví dụ trong tài liệu. TV2 tiếp tục quản lý nhánh ứng dụng sau khi nhận tích hợp; giữ config vận hành/kubeconfig/token/private key/cache ngoài Git.

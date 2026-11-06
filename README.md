@@ -30,6 +30,8 @@ Phiên bản được ghim tại `config/versions.env`. Điền project trong `i
 
 Thông số ứng dụng nhập qua `config/application.json` theo file example. `scripts/render-application.py` kiểm tra thông số rồi tạo route và policy riêng cho lần chạy. Không apply cả thư mục kết quả; làm theo thứ tự trong hướng dẫn để kiểm chứng từng lớp.
 
+Phần Bookinfo chuẩn bị trên laptop ngày 06/11 có source upstream kèm hash/giấy phép và `scripts/prepare-bookinfo.py` để sinh workload baseline không injection, probes/tài nguyên và reviews-v2. Sau baseline được review mới tích hợp Istio/injection/route rồi thử policy từng lớp. Xem [kết quả local và việc còn chờ](docs/evidence/TV3-status.md); chưa dùng những kết quả offline này để nghiệm thu cloud. Renderer hỗ trợ tùy chọn `public_http_matches` cho các path website cụ thể, giữ `public_path_prefix` cho config cũ.
+
 ## Tài liệu bắt đầu
 
 - [Triển khai cloud từng bước](docs/deploy-cloud.md)
@@ -39,12 +41,10 @@ Thông số ứng dụng nhập qua `config/application.json` theo file example.
 - [TV2: runbook triển khai Kubernetes Service (Bookinfo)](docs/tv2-runbook.md)
 - [TV2: ứng dụng Bookinfo — nguồn, giấy phép và bảng kê Service](apps/bookinfo/README.md)
 - [TV2: trạng thái công việc và bằng chứng](docs/evidence/TV2-status.md)
-- [TV3: việc có thể làm và điều kiện bàn giao hiện tại](docs/tv3-current-work.md)
-- [TV3: bộ công cụ, kiểm thử và hướng dẫn thực hiện](docs/tv3-runbook.md)
-- [TV3: công việc laptop, công cụ portable và kiểm tra offline](docs/tv3-laptop.md)
+- [TV3: hướng dẫn laptop, công cụ và thực hiện trên cloud](docs/tv3-runbook.md)
+- [TV3: quyền truy cập, đầu vào và bàn giao cho nhóm](docs/tv3-handover.md)
 - [TV3: ma trận kiểm thử và bằng chứng](docs/tv3-test-matrix.md)
-- [TV3: checklist nhận quyền truy cập và ứng dụng](docs/tv3-access-checklist.md)
-- [Bàn giao TV3 cho TV1/TV2 qua branch hoặc gói source local](docs/tv3-handover.md)
+- [TV3: trạng thái, kết quả đã kiểm tra và việc còn chờ](docs/evidence/TV3-status.md)
 - [Hướng dẫn TV1](docs/tv1-setup.md)
 - [Inventory mẫu](docs/inventory.example.md)
 

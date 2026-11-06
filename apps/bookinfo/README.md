@@ -1,41 +1,46 @@
-# apps/bookinfo · Ứng dụng mẫu do TV2 chọn
+# Bookinfo · Ứng dụng TV2 chọn và cấu hình tích hợp local
 
-Ứng dụng kiểm chứng Kubernetes Service của nhóm là **Bookinfo**, lấy từ samples của release Istio đã ghim trong [`config/versions.env`](../../config/versions.env) (`ISTIO_VERSION=1.30.7`). Bookinfo là nhiều microservice gọi nhau qua tên Service nội bộ, phù hợp để chứng minh DNS → selector → EndpointSlice → Pod và tách lỗi quyền truy cập.
+TV2 chọn **Bookinfo** từ samples Istio `1.30.7`, đồng bộ [versions.env](../../config/versions.env). App kiểm chứng Service → selector → EndpointSlice → Pod qua `productpage → reviews-v2 → ratings`, đồng thời productpage gọi details. Cập nhật 06/11/2026 chuẩn bị trên laptop; chưa deploy/nghiệm thu cloud.
 
-## Nguồn và giấy phép
+## Source và chuẩn bị workload
 
-| Trường | Giá trị |
+Source upstream tại [upstream](upstream/), kèm Apache-2.0 và checksum/provenance [source-lock.json](source-lock.json). Chạy từ root repo:
+
+```bash
+python3 scripts/prepare-bookinfo.py
+```
+
+Lệnh xác minh source/hash rồi sinh thư mục mới `.generated/bookinfo-*`; không tải package, gọi Kubernetes hoặc apply. Thêm `--check` nếu chỉ muốn xác minh mà chưa sinh output. `namespace-baseline.json` tắt injection; `workloads.json` chứa Service/SA/Deployment, probes/tài nguyên lab; `preparation.json` là metadata. Chỉ hai file đầu là resource. Không cần tải full release Istio để lấy app; TV3 cài Istio nền qua Helm riêng.
+
+Image dự kiến giữ registry/tag upstream: `registry.istio.io/release/examples-bookinfo-*:1.20.3`. Đây là tag nguồn, **chưa phải digest/imageID runtime**. TV2 điền tag/imageID, Pod UID, Service/EndpointSlice và kết quả thật vào [inventory](service-inventory.md) sau deploy. Giữ reviews-v2 một replica cho cạnh ratings, reviews-v1/v3 bằng 0. Probes/resources là cấu hình lab cần theo dõi, không chứng minh runtime đã đủ tài nguyên.
+
+## Config mesh và policy
+
+[application.bookinfo.json](application.bookinfo.json) là config thiết kế cho [renderer](../../scripts/render-application.py), có thể render trực tiếp trên laptop:
+
+```bash
+python3 scripts/tv3.py render apps/bookinfo/application.bookinfo.json
+```
+
+| Trường | Giá trị / phạm vi |
 |---|---|
-| Nguồn | https://github.com/istio/istio — thư mục `samples/bookinfo` |
-| Release/tag | `1.30.7` (đồng bộ với `ISTIO_VERSION`); manifest lấy từ gói release `istio-1.30.7` |
-| Giấy phép | Apache License 2.0 |
-| Image | Dùng image `docker.io/istio/examples-bookinfo-*` đã ghim trong manifest của **đúng release 1.30.7**, không dùng tag `latest` |
+| Namespace | bookinfo; baseline tắt injection, sau mesh Ready mới bật/rollout |
+| Entry / Service port | productpage:9080 |
+| Gateway paths | Exact /productpage, /login, /logout, /api/v1/products; prefix /static/, /api/v1/products/; không route toàn bộ / |
+| Target Service / Pod port | ratings:9080 / TCP 9080 |
+| Target labels | app=ratings |
+| Caller / ServiceAccount | app=reviews / bookinfo-reviews |
+| API được phép | **GET /ratings/0**, cùng ID 0 của website /productpage |
+| Nguồn đối chứng | productpage-v1, SA bookinfo-productpage, gọi thẳng ratings |
 
-**Không hard-code tag image trong repo.** Tag image Bookinfo gắn với từng release Istio; để đúng digest, TV2 áp manifest trực tiếp từ thư mục `samples/bookinfo/platform/kube/bookinfo.yaml` của gói `istio-1.30.7` đã tải, rồi **ghi lại tag/digest thực tế** quan sát được vào [`service-inventory.md`](service-inventory.md). Đây là cách "ghim theo release" mà README gốc yêu cầu.
+Renderer hỗ trợ `public_http_matches` tường minh; `public_path_prefix` là fallback cho config cũ không có trường này. Route website không mở thêm quyền vào ratings: AuthorizationPolicy chỉ cho principal reviews GET đúng path. [Productpage](https://raw.githubusercontent.com/istio/istio/1.30.7/samples/bookinfo/src/productpage/productpage.py) dùng ID 0; [reviews](https://raw.githubusercontent.com/istio/istio/1.30.7/samples/bookinfo/src/reviews/reviews-application/src/main/java/application/rest/LibertyRestEndpoint.java) chuyển ID đó tới ratings.
 
-## Ánh xạ Bookinfo vào renderer tích hợp
+## Luồng bàn giao
 
-[`scripts/render-application.py`](../../scripts/render-application.py) sinh Gateway/VirtualService/PeerAuthentication/AuthorizationPolicy/NetworkPolicy từ `config/application.json`. File [`application.bookinfo.json`](application.bookinfo.json) trong thư mục này là **bản tham chiếu** đã điền sẵn cho Bookinfo — copy sang `config/application.json` (file đó bị `.gitignore`, không commit):
+1. TV1 giao cụm Ready/quyền/context; TV3/TV2 kiểm tra NET01 trên Calico hiện có.
+2. TV2 deploy baseline không injection từ output chuẩn bị, chứng minh website/DNS/HTTP/endpoint; TV1 review.
+3. TV3 cài Istio/gateway/Prometheus/Kiali; TV2 bật injection, rollout app, áp route và kiểm tra app/proxy Ready.
+4. TV2 chạy Service/STRICT/AuthorizationPolicy từng lớp/phục hồi; TV3 quan sát/NetworkPolicy/selector lab/kiểm tra chéo.
+5. Điền inventory/[phiếu app](../../docs/application-handover.md), lưu evidence thật và người chạy lại.
 
-| Ô renderer | Giá trị Bookinfo | Ý nghĩa |
-|---|---|---|
-| namespace | `bookinfo` | Namespace ứng dụng, bật `istio-injection=enabled` |
-| entry_service / port | `productpage` / `9080` | Service nhận request từ ingress gateway |
-| public_path_prefix | `/productpage` | Đường vào website qua gateway |
-| target_service / port / target_port | `ratings` / `9080` / `9080` | Service đích để thử DNS/selector/EndpointSlice |
-| target_labels | `app=ratings` | Selector Pod đích |
-| allowed_caller_labels | `app=reviews` | Nguồn hợp lệ (reviews-v2 gọi ratings) |
-| allowed_service_account | `bookinfo-reviews` | Danh tính workload được phép gọi ratings |
-| allowed_http_methods / paths | `GET` / `/ratings/1` | API thử; ca dùng đúng sách ID 1 |
-
-Luồng nội bộ: `gateway → productpage → reviews(v2) → ratings`. `productpage` cũng gọi `details`. Nguồn đối chứng bị chặn là `productpage` (ServiceAccount `bookinfo-productpage`, gọi thẳng `ratings` không được phép).
-
-## Thứ tự triển khai (chi tiết trong [docs/tv2-runbook.md](../../docs/tv2-runbook.md))
-
-1. TV3 xác nhận Istiod + ingress gateway Ready.
-2. `kubectl apply -f "$GEN/namespace.json"` (namespace đã bật injection) — `$GEN` là thư mục renderer vừa in.
-3. Áp manifest Bookinfo từ samples release 1.30.7 vào namespace `bookinfo`.
-4. Giữ `reviews-v2` (scale `reviews-v1`, `reviews-v3` về 0) để cạnh reviews → ratings ổn định.
-5. `kubectl apply -f "$GEN/gateway.json"` và `"$GEN/route.json"`.
-6. Port-forward gateway, mở `/productpage`, xác nhận có điểm sao.
-7. Điền [`service-inventory.md`](service-inventory.md) bằng dữ liệu thật và bàn giao [`docs/application-handover.md`](../../docs/application-handover.md) cho TV3.
+Lệnh, công cụ app/debug container có curl + getent, native proxy Ready và rollback ở [runbook TV2](../../docs/tv2-runbook.md). Không lấy cố định 2/2 làm tiêu chí proxy; không apply nguyên output renderer hoặc chạy cloud khi chỉ chuẩn bị local.

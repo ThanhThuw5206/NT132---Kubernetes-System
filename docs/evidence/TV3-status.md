@@ -1,68 +1,69 @@
-# Trạng thái công việc TV3 · 05/11/2026
+# TV3 · Trạng thái và kết quả
 
-Phạm vi đã thực hiện: **source, công cụ và kiểm tra local** trên laptop Windows. Source nền `17aaed9`; nhánh bàn giao `tv3/istio-network`. Ghi commit thực tế bằng `git rev-parse HEAD` khi lấy mã. Không tạo VM/LB, không cài hoặc đổi policy trên cụm cloud trong phiên này.
+Cập nhật **06/11/2026 (Asia/Saigon)**. Đây là nơi ghi việc đã làm và bằng chứng. Cách thực hiện nằm ở [runbook](../tv3-runbook.md), đầu vào/người nhận ở [bàn giao](../tv3-handover.md), tiêu chí ở [ma trận kiểm thử](../tv3-test-matrix.md).
 
-**Cập nhật nhận từ TV1:** branch `tv1/cloud-config` tại `612e3b0` ghi nhận ba node Ready, Pod IP/ClusterIP/DNS trả 200 và Rancher thấy ba node Active ngày 05/11/2026; Istio/Kiali/app/policy chưa triển khai. Đây là trạng thái TV1 bàn giao trong repo, không phải một lần nghiệm thu cloud mới của TV3. Các bảng Chưa chạy dưới đây nói về các ca TV3 trong phiên chuẩn bị này; nhận quyền/inventory trước khi thử lại, không dựng trùng hoặc reset cụm đang có.
+## 1. Source và phạm vi
 
-## Đã hoàn thành trên máy
+Nhánh bàn giao `tv3/istio-network` đã nhận TV1 `612e3b0` và merge fast-forward TV2 `4377766` từ `89f106d`; source nền là `17aaed9`. TV2 chọn Bookinfo, sau đó TV3 bổ sung phần tích hợp trên laptop và gộp tài liệu còn bốn file. Ghi HEAD và hash gói thực tế khi nhận mã; kết quả ở đây không thay nghiệm thu cloud.
 
-| Sản phẩm | File / kết quả |
+Đợt chuẩn bị này chưa bật/tắt VM, SSH, import CA/sửa hosts, cài mesh/app hoặc apply policy trên cloud. Chỉ có các phép đọc project/VM và thử quyền IAM đã ghi dưới đây; không có nghiệm thu Kubernetes/Rancher trực tiếp bằng tài khoản TV3. Slide tạm bỏ qua theo yêu cầu.
+
+## 2. Phần local đã hoàn thành
+
+| Sản phẩm | Kết quả / nơi nhận |
 |---|---|
-| Đối chiếu phân công và phụ thuộc | [tv3-current-work.md](../tv3-current-work.md), [runbook](../tv3-runbook.md) |
-| Bảng phiên bản và thiết kế mạng | [Calico README](../../cluster/calico/README.md); đã đối chiếu tài liệu chính thức cho dải Kubernetes của Calico/Istio, chưa xác minh runtime thật |
-| NET01 hai chiều | Fixture có client/server trên mỗi worker, script gọi Pod IP/ClusterIP/DNS sáu lượt, lưu log/exit code, kiểm tra label sở hữu trước apply |
-| Readiness Calico | Script cài đặt chờ Available=True, Progressing=False, Degraded=False với timeout; có test mô phỏng Degraded |
-| Snapshot riêng TV3 | `scripts/tv3.py snapshot`: kiểm tra nền không phụ thuộc Rancher, ghi node/runtime/image/Helm và pins |
-| Công cụ OBS01 | `scripts/tv3.py traffic`: GET có timeout/thời lượng, timestamp UTC+07:00, ghi status/lỗi, không ẩn redirect |
-| Manifest SVC04 | `scripts/tv3.py render`: Service thử riêng có hai trạng thái selector sai/đúng, dùng ports/labels từ config thật |
-| Policy và phép thử DNS/HTTP | Tái sử dụng renderer sẵn có; `scripts/tv3.py probe` ghi nguồn/danh tính/policy/EndpointSlice và kết quả gọi |
-| Bằng chứng SVC02/SVC03 | `service-snapshot` ghi Service UID/ClusterIP/selector/ports và kiểm tra EndpointSlice targetRef/IP khớp Pod Ready được selector chọn; không tự restart/scale |
-| Proxy theo phiên bản hiện tại | Probe nhận cả proxy thường và native sidecar Ready; đọc policy namespace ứng dụng và root mesh, ghi lỗi nếu evidence thiếu |
-| Gói bàn giao source local | `package` tạo overlay ZIP/manifest/SHA256SUMS theo allowlist, gồm thay đổi chưa commit; `verify-package` đối chiếu từng file sau giải nén |
-| Quy trình nghiệm thu | [C1–C4](../../tests/security/README.md), [SVC04](../../tests/service/README.md), [OBS01](../../observability/README.md), [ma trận luật mạng](../../network/policies/README.md) |
-| Hồ sơ kết quả | [Mẫu evidence](templates/test-result.md), giữ trạng thái chưa chạy cho cloud |
-| Hướng dẫn cho TV1/TV2 | [Phiếu bàn giao](../tv3-handover.md), cách lấy branch TV3, bảng người nhận/đầu vào/mốc/ký nhận và cách chuyển source lên VM |
-| Chuẩn bị laptop | [Hướng dẫn laptop](../tv3-laptop.md), checker offline có log, Google Cloud CLI portable 592.0.0 với archive đã so SHA256 chính thức; `--version` chạy thành công |
-| Ma trận/đầu vào | [Ma trận C0–C4/C1b và các ca Service](../tv3-test-matrix.md), [checklist TV1/TV2](../tv3-access-checklist.md), đã điền thông số có trong repo và trạng thái công cụ của máy hiện tại |
+| Nền mạng | NET01 sáu request hai chiều, nhận diện worker FQDN bằng InternalIP, retry và log từng lượt; script Calico có chờ trạng thái Available/Progressing/Degraded |
+| Công cụ TV3 | Snapshot nền; traffic; probe nguồn/SA/DNS/policy/endpoint; Service snapshot trước-sau thay Pod/scale; Service thử selector riêng; package/verify-package |
+| Bookinfo có nguồn | [Source lock](../../apps/bookinfo/source-lock.json), YAML upstream Istio 1.30.7, JSON tương đương và Apache LICENSE; SHA256 được kiểm tra trước khi sinh workload |
+| Baseline offline | `prepare-bookinfo.py` sinh namespace injection disabled và 14 resource; chỉ reviews-v2 hoạt động cùng ba app còn lại; có probes và requests/limits ban đầu |
+| Tích hợp route/policy | GET `/ratings/0` đúng luồng website; route tường minh productpage/static/login/logout/API; giữ principal reviews và cổng ratings 9080, tương thích config cũ |
+| Readiness | Helper đọc Pod JSON, hỗ trợ proxy thường/native, phân biệt baseline không proxy với mesh; không dùng cứng cột 2/2 |
+| Hướng dẫn nhóm | Baseline → TV1 review → mesh/quan sát → injection/rollout/route → policy từng lớp và phục hồi; debug cùng Pod có curl/getent và quyền phù hợp |
 
-Theo yêu cầu hiện tại, bỏ qua slide; không đưa slide vào gói bàn giao đợt laptop. Người dùng đã đăng nhập bằng tài khoản riêng. Phép kiểm tra chỉ đọc ngày 05/11 xác nhận project/VM truy cập được, OS Login/Admin và IAP trên cp-01/wk-02 có hiệu lực, quyền start/stop ba VM không có. Lúc kiểm tra ba VM đang TERMINATED. Chưa import CA, sửa hosts, SSH, thay IAM hoặc khởi động/cài đặt lên cụm; chưa kiểm tra Kubernetes/Rancher trực tiếp bằng tài khoản TV3.
+Workload/probes/resources là thiết kế local, chưa đo startup/RAM/OOM trên cụm. Tag image upstream `registry.istio.io/release/*:1.20.3` chưa thay được imageID/digest runtime. Chi tiết thiết kế và nguồn ở [Bookinfo README](../../apps/bookinfo/README.md); dữ liệu thật còn chờ trong [inventory](../../apps/bookinfo/service-inventory.md).
 
-## Kiểm tra local đã chạy
+## 3. Kiểm tra đã chạy
 
-Môi trường: Python **3.15.2** từ runtime uv đã có trên máy; Git Bash **5.3.15**. Không cài thêm package Python, không cần WSL.
+- Python SDK **3.14.9**, Git Bash **5.3.15**: **50/50 test đạt**. Sáu kiểm tra tổng hợp đạt: unit test, source/hash/sinh baseline Bookinfo, render tích hợp, cú pháp Bash, cú pháp PowerShell và `gcloud --version`. Log/report/manifests lần kiểm tra trước khi commit: `.generated/laptop-check-chzr5nyc/`.
+- Đã đối chiếu YAML/JSON upstream bằng parser có sẵn: cùng 14 resource. Runtime công cụ chỉ dùng thư viện chuẩn; `.gitattributes` giữ nguyên bytes upstream qua Windows/Linux.
+- Gói source của đợt tích hợp đã được kiểm tra checksum, giải nén sang thư mục riêng và chạy lại đủ 50 test đạt. Lượt gọn tài liệu cập nhật liên kết/allowlist và kiểm tra lại gói; số file của từng gói nằm trong manifest, không dùng ZIP cũ để nhận phần tài liệu mới.
+- Python **3.15.2 qua uv** bị Windows Application Control chặn DLL `_overlapped` ở lượt 06/11, cả trong và ngoài sandbox. Không đổi chính sách Windows; dùng runtime SDK theo runbook. Kết quả 37 test trước đây được thay bằng kết quả 50 test mới ở trên.
 
-```text
-uv run --offline --no-project python -m unittest discover -s tests -v
-Ran 37 tests
-OK
+Test dùng mock/HTTP loopback và không gọi API project. Kết quả offline không chứng minh VM Ready, traffic Kiali hoặc policy cloud đã đạt.
 
-uv run --offline --no-project python scripts/tv3.py --help
-Exit 0
+## 4. Truy cập đã kiểm tra
 
-Bash syntax: scripts/*.sh
-Passed
-
-git diff --check
-Passed
-```
-
-37 test gồm: 5 test renderer; 3 test nhận diện node theo InternalIP; 8 test NET01/Calico với kubectl/curl giả; 11 test công cụ TV3; 4 test package/native sidecar/ánh xạ Service–Pod; 6 test HTTP body/timeout/report (có server loopback thật). NET01 và snapshot đã được kết hợp với hỗ trợ FQDN của TV1; các test kiểm tra cả retry tạm thời và ghi lại lỗi từng lần. Các ca lỗi khác bao gồm DNS/thiếu lệnh, Pod cùng node, resource thuộc người khác, Calico Degraded, config placeholder, ghi đè output, endpoint sai Pod UID, rollout cũ, package thiếu/chứa file không được phép hoặc bị đổi sau đóng gói, body bị cắt/chunk sai/quá lớn và Ctrl+C. Các test này không chứng minh CNI/mesh/policy đang hoạt động trên Google Cloud.
-
-Đã rà lại phân công với kế hoạch đồ án: TV3 chủ trì NET01/OBS01/SEC03/SVC04, kiểm tra chéo IAM01/SVC02/SEC01/SVC03/PUB01 và phối hợp OPS01. Các thành viên xem phiếu bàn giao để nhận đúng source/đầu việc; phần ứng dụng, Service/route và luật Istio vẫn do TV2 xác nhận, hạ tầng/Rancher/LB do TV1 phụ trách.
-
-Giới hạn công cụ được ghi rõ: timeout HTTP là thời gian socket không nhận dữ liệu, không phải hạn tổng thời gian; Ctrl+C giữ report chưa hoàn tất. 503/504 qua proxy chỉ là dấu hiệu upstream cần đối chiếu log/baseline/phục hồi, không tự nghiệm thu SEC03. Source chưa commit được chuyển bằng overlay, không dựa vào `git archive HEAD` riêng lẻ.
-
-## Chưa nghiệm thu cloud
-
-| Test / công việc | Trạng thái thực tế trong phiên | Đầu vào để chạy tiếp |
+| Lần kiểm tra | Kết quả có bằng chứng | Giới hạn |
 |---|---|---|
-| Tiếp nhận wk-02 | TV1 đã bootstrap theo bàn giao; TV3 chưa SSH kiểm tra trực tiếp | TV1 bật cụm theo lịch; xác nhận phiên SSH/context, không prepare/join lại |
-| Calico / NET01 | TV1 đã ghi nhận CNI/Service hoạt động; TV3 chưa chạy lại fixture hai chiều trên cụm | Node Ready, context đúng và phạm vi thử được thống nhất; không cài lại Calico |
-| Istio / Prometheus / Kiali | Chưa cài trong phiên | Mạng nền đạt, Helm và quyền quản trị phù hợp |
-| OBS01 | Chưa chạy trên ứng dụng | TV2 giao app/sidecar/route và request tạo luồng nội bộ |
-| SEC01–SEC04 | Chưa chạy trên ứng dụng | Hai nguồn thật, labels/ServiceAccount/API, baseline và chính sách đã thống nhất |
-| SVC04 | Chưa chạy trên ứng dụng | Service thật, nguồn hợp lệ; TV1 sửa thử và TV2 gọi lại |
-| PUB01 | Chưa chạy | TV1 giao frontend LB/firewall, app qua gateway đã đạt |
-| Kiểm tra chéo | Chưa chạy | TV1/TV2 chạy lại và ghi nhận bằng chứng |
+| API chỉ đọc ngày 05/11 | Tài khoản ACTIVE, đọc được project `nt132-kubernetes-513805` và ba VM ở `asia-southeast1-a` | Không ghi email/token vào repo |
+| IAM đã thử | OS Login/Admin và IAP có hiệu lực trên cp-01/wk-02 | Chưa thử kết nối SSH, firewall, sudo hoặc Kubernetes thực tế |
+| Sau khi TV1 phân lại quyền | `testIamPermissions` trả có start và stop trên cả cp-01/wk-01/wk-02 | Chỉ thử quyền, không bật/tắt VM; không gọi lại IAM trong đợt sửa/gọn tài liệu |
+| Snapshot Compute ngày 05/11 | Ba VM TERMINATED, IP nội bộ 10.20.0.10/.11/.12 | Là dữ liệu lịch sử; trạng thái chạy/dừng hiện tại chưa kiểm tra lại |
 
-Ứng dụng và project cloud không được tự chọn thay TV1/TV2. Khi nhận đầu vào, chạy theo [runbook TV3](../tv3-runbook.md), lưu log thật và nhờ thành viên khác tái hiện trước khi đổi trạng thái sang Đạt. File này không khẳng định cloud ngoài phiên hiện đang chạy hay đã dừng.
+## 5. Cloud và kiểm tra chéo còn chờ
+
+TV1 `612e3b0` ghi nhận ngày 05/11: ba node v1.35.10 Ready, Pod IP/ClusterIP/DNS trả 200, Rancher đủ ba node Active; Istio/Kiali/app/policy chưa triển khai. Đây là ghi nhận bàn giao của TV1, chưa được TV3 kiểm tra lại trong đợt local.
+
+| Việc | Trạng thái TV3 / đầu vào cần tiếp |
+|---|---|
+| Tiếp nhận wk-02, Calico và NET01 | Chưa SSH/chạy lại trên cụm; cần phiên/quyền và lịch lab. Không prepare/join/reset/cài lại CNI hiện có |
+| App baseline trước mesh | TV2 chưa deploy/nghiệm thu; cần hai nguồn HTTP/DNS, endpoint Ready và TV1 review |
+| Istio, gateway, Prometheus/Kiali | Chưa cài/nghiệm thu; cần baseline, Helm/quyền cấp cluster và lịch tích hợp |
+| OBS01, SEC01–04, SVC04 | Chưa chạy trên ứng dụng; cần proxy/route, dữ liệu app và nguồn thử thật, policy nền/rollback |
+| IAM01, SVC02/SVC03, PUB01, OPS01 | Chưa kiểm tra chéo; cần viewer riêng, lịch thử app/LB và thành viên chạy lại |
+
+TV3 chủ trì NET01/OBS01/SEC03/SVC04; TV2 sở hữu workload/Service/route và luật Istio; TV1 sở hữu hạ tầng/Rancher/LB. Điều kiện giao nhận chi tiết chỉ cập nhật tại [phiếu bàn giao](../tv3-handover.md). Chỉ ghi Đạt khi có kết quả thực, phục hồi và người thứ hai chạy lại.
+
+## 6. Nguồn phân công và điều chỉnh so với kế hoạch
+
+Đã đối chiếu [kế hoạch repo](../plan.md) và file người dùng cung cấp `E:\Down\KE_HOACH_TONG_THE_KUBERNETES_3_VM_GOOGLE_CLOUD.md`, SHA256 `591D4A3BD7EAC2ACAF78C0BE148D8E3EF23D47D49683412CA5B660F3FBA0CCB2`. Kế hoạch/lịch không phải bằng chứng thao tác đã chạy.
+
+| Kế hoạch gốc | Quyết định trong source hiện tại |
+|---|---|
+| Bookinfo / reviews → ratings | TV2 đã tự chốt Bookinfo tại 4377766; dùng thiết kế đã bàn giao, runtime còn chờ |
+| Control plane 4 GiB/20 GB, worker disk 30 GB | Terraform hiện đặt ba VM 8 GiB, tổng boot disk 30+40+40=110 GB; không dựng trùng hạ tầng |
+| Headlamp trước, Rancher tuần 2 | TV1 đã đưa Rancher vào sớm; TV3 tập trung Prometheus/Kiali và mạng/policy |
+| NodePort tuần 2 | Gateway đã cấu hình NodePort 30080; public LB tùy chọn, tunnel không thay PUB01 |
+| Thử cộng dồn policy | C2/C3 phải chạy riêng và phục hồi trước C4 kết hợp, theo ma trận |
+
+Mốc dự kiến của kế hoạch: M1 06/11, M2 13/11, M3 20/11, M4 27/11; không suy ra mốc đã hoàn thành từ ngày trên lịch. Chốt source/phiên demo theo kết quả thật của nhóm.

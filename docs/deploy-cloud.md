@@ -225,12 +225,14 @@ echo
 
 ## 8. Cài Istio, Prometheus, Kiali — TV3 phối hợp TV1
 
+**Điều kiện trước bước này (cập nhật local 06/11):** TV2 đã triển khai Bookinfo baseline không injection, kiểm chứng Service/DNS/HTTP và TV1 review. Làm phần baseline tại [runbook TV2](tv2-runbook.md) trước; chưa cần Istio để chạy baseline. Source Bookinfo/hash/license được chuẩn bị sẵn trong repo bằng `scripts/prepare-bookinfo.py`, không giả định đã có `~/istio-1.30.7/samples`. Các bước dưới là hướng dẫn cho phiên cloud, chưa được chạy trong đợt laptop.
+
 Trên **cp-01**:
 
 ```bash
-bash scripts/05-install-istio.sh
-bash scripts/07-install-observability.sh
-bash scripts/08-verify-cluster.sh
+bash scripts/05-install-istio.sh || exit 1
+bash scripts/07-install-observability.sh || exit 1
+bash scripts/08-verify-cluster.sh || exit 1
 kubectl -n istio-system get pods,svc
 ```
 
@@ -250,45 +252,54 @@ Giữ tunnel Windows ở phần trước. Mở `http://localhost:20001` để xe
 
 ## 9. Nhận ứng dụng TV2 và tạo config tích hợp
 
-TV2 bàn giao namespace, Service đầu vào, Service đích nội bộ, port Service và port container, labels Pod, ServiceAccount của caller, đường HTTP dùng kiểm thử, manifest/image đã ghim và tài nguyên cần dùng. Xem thêm `application-handover.md`. Không mặc định có database/PVC; nếu app cần lưu dữ liệu, phải thống nhất phương án storage và backup trước khi triển khai. Boot disk của VM không tự trở thành PersistentVolume.
+TV2 đã chọn Bookinfo. Bàn giao runtime vẫn gồm namespace, Service đầu vào/đích, ports, labels, ServiceAccount, đường HTTP, imageID và kết quả baseline thật. Xem [phiếu app](application-handover.md) và [runbook TV2](tv2-runbook.md). Workload được sinh offline từ source upstream có hash/license bằng `scripts/prepare-bookinfo.py`; không tải lại manifest không kiểm tra nguồn. Bookinfo hiện không dùng PVC; nếu đổi ứng dụng cần storage, nhóm thống nhất riêng. Boot disk của VM không tự trở thành PersistentVolume.
+
+Các lệnh copy sau chỉ dùng lần đầu. Nếu `config/application.json` đã có, so sánh với bản tham chiếu và giữ thay đổi vận hành cần thiết trước khi thay; không ghi đè config của phiên đang dùng.
 
 Trên **cp-01**:
 
 ```bash
-cp config/application.example.json config/application.json
-nano config/application.json
-python3 scripts/render-application.py config/application.json
+cp apps/bookinfo/application.bookinfo.json config/application.json || exit 1
+GEN=$(python3 scripts/tv3.py render config/application.json) || exit 1
+export GEN
+echo "$GEN"
 ```
 
-Thay toàn bộ REPLACE_ME. `entry_service_port` và `target_service_port` là cổng Service; `target_port` là cổng Pod thực nhận traffic, dùng cho NetworkPolicy. `allowed_caller_labels` nhận diện Pod gọi, `allowed_service_account` phải đúng ServiceAccount caller thực sử dụng. Caller và target phải cùng namespace theo mô hình renderer hiện tại. `allowed_http_paths` là API trên target, không nhất thiết là URL ngoài gateway. Cần caller/target khác nhau để kiểm tra giao tiếp east-west.
+Đối chiếu config tham chiếu với baseline thật trước khi apply. `entry_service_port` và `target_service_port` là cổng Service; `target_port` là cổng Pod thực nhận traffic, dùng cho NetworkPolicy. Caller và target cùng namespace; SA/labels phải đúng workload. Bookinfo dùng GET `/ratings/0`, trùng product ID của `/productpage`. Tùy chọn `public_http_matches` chọn rõ các URI productpage/static/login/logout/API; config cũ không có trường này vẫn dùng một match `public_path_prefix`.
 
-Script kiểm tra đầu vào rồi in thư mục riêng `.generated/application-...`. Gán đường dẫn **đúng kết quả vừa in**, không dùng glob chọn nhầm lần cũ:
+Renderer in đúng thư mục mới `.generated/tv3-*` vào `$GEN`; không dùng glob chọn nhầm lần cũ. Sau khi Istio/gateway ở mục 8 Ready, TV2 bật injection cho namespace baseline đã có:
 
 ```bash
-export GEN='/home/THAY_USER/NT132---Kubernetes-System/.generated/application-THAY_MA'
-kubectl apply -f "$GEN/namespace.json"
+kubectl apply -f "$GEN/namespace.json" || exit 1
 ```
 
-Sau đó TV2 apply các manifest đã bàn giao trong `apps/`, theo đúng đường dẫn và thứ tự TV2 ghi. Namespace đã bật injection trước lúc tạo Pod. Với Deployment đã tồn tại, TV2 rollout restart từng Deployment và kiểm tra `READY` có app container cùng sidecar. Không bật injection cho kube-system, cattle-system hoặc toàn cluster.
+TV2 rollout bốn Deployment baseline theo runbook TV2 để Pod mới nhận proxy; không cần tạo lại Namespace hoặc dựng lại baseline. Không bật injection cho kube-system, cattle-system hoặc toàn cluster. Kiểm tra app/proxy Ready bằng helper hỗ trợ native sidecar:
 
 ```bash
-kubectl apply -f "$GEN/gateway.json"
-kubectl apply -f "$GEN/route.json"
-kubectl -n TEN_NAMESPACE_THAT get pods,svc,endpointslice
-curl -i http://127.0.0.1:8080/DUONG_DAN_THAT
+kubectl -n bookinfo rollout restart deploy/details-v1 deploy/productpage-v1 deploy/reviews-v2 deploy/ratings-v1 || exit 1
+for deploy in details-v1 productpage-v1 reviews-v2 ratings-v1; do
+  kubectl -n bookinfo rollout status "deployment/$deploy" --timeout=300s || exit 1
+done
+kubectl -n bookinfo get pods -o json | python3 scripts/check-bookinfo-pods.py || exit 1
+kubectl apply -f "$GEN/gateway.json" || exit 1
+kubectl apply -f "$GEN/route.json" || exit 1
+kubectl -n bookinfo get pods,svc,endpointslice
+curl -i http://127.0.0.1:8080/productpage
 ```
 
-Lệnh curl chạy trên cp-01 khi port-forward app đang mở. Thay namespace/path bằng giá trị TV2. Không chạy `kubectl apply -f "$GEN"`: thư mục có `inputs.json` không phải Kubernetes resource, và các policy cần triển khai từng bước để có đối chứng.
+Lệnh curl chạy trên cp-01 khi port-forward app đang mở. Thay namespace/path bằng giá trị TV2. Thực hiện các bước triển khai trong terminal SSH lab riêng: `|| exit 1` dừng terminal đó nếu lệnh lỗi, không tiếp tục apply sau lỗi renderer/rollout/checker. Giữ forwarding ở terminal khác. Nếu config/application.json đã có, đối chiếu trước khi copy bản tham chiếu. Không chạy `kubectl apply -f "$GEN"`: thư mục có `inputs.json` không phải Kubernetes resource, và các policy cần triển khai từng bước để có đối chứng.
 
 ## 10. Kiểm thử bảo mật theo từng lớp — TV3
 
 Trước mỗi lớp, ghi request nguồn, đích, danh tính, HTTP status và kỳ vọng. TV2 cung cấp cách gọi API thật từ caller; không áp dụng policy trước khi kiểm tra labels/ServiceAccount/sidecar.
 
-1. **Baseline:** caller gọi target thành công khi chưa có policy. Xem Service selector khớp Pod và EndpointSlice có endpoint Ready.
-2. **mTLS:** `kubectl apply -f "$GEN/mtls.json"`. Caller trong mesh phải tiếp tục thành công; client không có sidecar phải bị từ chối khi vào target STRICT. Nếu dùng TCP thay HTTP, renderer HTTP AuthorizationPolicy không phù hợp và phải đổi thiết kế.
-3. **Danh tính và API:** `kubectl apply -f "$GEN/authorization.json"`. Caller dùng đúng ServiceAccount, method và path được phép phải thành công. Caller khác ServiceAccount hoặc sai method/path phải bị chặn; thường có403 tại Envoy. Policy chỉ áp dụng target_labels, không áp toàn namespace.
-4. **Mạng:** `kubectl apply -f "$GEN/network-policy.json"`. Chỉ Pod đúng caller_labels trong cùng namespace được vào target_port. Traffic từ Pod khác phải thất bại ở lớp mạng. Cho phép riêng metrics từ Prometheus namespace istio-system theo selector kết hợp; không mở toàn namespace đó vào port app.
-5. **Đối chiếu:** chạy lại request được phép sau mỗi lớp để chắc rằng hệ thống vẫn phục vụ. HTTP403 thường là AuthorizationPolicy, timeout thường cần kiểm tra NetworkPolicy/routing, không kết luận chỉ từ status.
+1. **C0 sau mesh:** hai nguồn trong mesh gọi GET `/ratings/0` đều 200 trước luật hạn chế; Service selector khớp Pod và EndpointSlice Ready. Baseline không proxy trước mesh là bước riêng.
+2. **C1 / mTLS:** chỉ áp `mtls.json`, hai nguồn trong mesh vẫn 200, có bằng chứng mTLS. C1b dùng client không proxy đã được cấp quyền, có lượt thành công trước STRICT; không mặc định lỗi TLS là HTTP 403.
+3. **C2 / danh tính và API:** giữ STRICT, chỉ thêm `authorization.json`. Reviews đúng SA/method/path được 200; productpage gọi thẳng target bị 403/RBAC. Lưu evidence, **gỡ riêng AuthorizationPolicy vừa tạo**, lặp hai nguồn đều 200 trước C3.
+4. **C3 / mạng:** giữ STRICT, xác nhận AuthorizationPolicy thử đã gỡ rồi chỉ thêm `network-policy.json`. Reviews qua TCP 9080 được, nguồn khác thất bại kết nối/upstream, DNS và endpoint còn đúng. Lưu evidence, **gỡ riêng NetworkPolicy vừa tạo**, lặp hai nguồn đều 200. Cho riêng metrics bằng selector namespace+Pod kết hợp, không mở toàn namespace vào cổng app.
+5. **C4 / kết hợp:** chỉ sau C2/C3 riêng và phục hồi đã đạt mới bật cả hai luật, thử hai nguồn và website có sao. Gỡ riêng luật thử, trở lại C1, đối chiếu nguồn/đích/path/trạng thái và người chạy lại. Không suy nguyên nhân lớp mạng chỉ từ một timeout/503.
+
+Thực hiện lệnh từng ca và rollback theo [runbook TV2](tv2-runbook.md), [security README](../tests/security/README.md) và [ma trận](tv3-test-matrix.md). Không ghi đè hoặc xóa policy nền của người khác để tạo baseline.
 
 Đường từ ingress gateway trực tiếp vào target sẽ bị policy này chặn nếu gateway không thuộc nhóm caller được cho phép. Chọn target là dịch vụ nội bộ sau entry service; nếu app có luồng khác, TV3 phải điều chỉnh ma trận nguồn/đích trước. NetworkPolicy này chỉ giới hạn ingress target, chưa có default-deny egress toàn namespace.
 

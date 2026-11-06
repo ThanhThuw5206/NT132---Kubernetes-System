@@ -1,5 +1,6 @@
 import copy
 import importlib.util
+import json
 import pathlib
 import unittest
 
@@ -55,6 +56,63 @@ class ApplicationRendererTests(unittest.TestCase):
         values = renderer.resources(self.cfg)
         self.assertEqual(values["gateway.json"]["spec"]["selector"], {"istio": "ingressgateway"})
         self.assertEqual(values["route.json"]["spec"]["gateways"], ["application-gateway"])
+
+    def test_legacy_config_preserves_its_single_prefix_route(self):
+        self.cfg["public_path_prefix"] = "/catalog"
+        matches = renderer.resources(self.cfg)["route.json"]["spec"]["http"][0]["match"]
+        self.assertEqual(matches, [{"uri": {"prefix": "/catalog"}}])
+
+    def test_rejects_ambiguous_or_nonliteral_public_routes_and_unknown_config(self):
+        for matches in ([], {}, [None], [{"regex": ".*"}],
+                        [{"exact": "/a", "prefix": "/a"}],
+                        [{"exact": "https://example.test/a"}], [{"prefix": "/a?b"}],
+                        [{"exact": "/a#b"}], [{"prefix": "/a*"}],
+                        [{"prefix": "/a\\b"}], [{"exact": "/a b"}],
+                        [{"exact": "/a\x00b"}], [{"exact": True}],
+                        [{"exact": "/a"}, {"exact": "/a"}]):
+            cfg = copy.deepcopy(self.cfg)
+            cfg["public_http_matches"] = matches
+            with self.subTest(matches=matches), self.assertRaises(ValueError):
+                renderer.resources(cfg)
+        cfg = copy.deepcopy(self.cfg)
+        cfg["public_http_match"] = [{"exact": "/a"}]
+        with self.assertRaises(ValueError):
+            renderer.resources(cfg)
+        del cfg["public_http_match"]
+        del cfg["public_path_prefix"]
+        with self.assertRaises(ValueError):
+            renderer.resources(cfg)
+
+    def test_bookinfo_routes_cover_ui_assets_and_api_without_exposing_other_paths(self):
+        cfg = json.loads((ROOT / "apps/bookinfo/application.bookinfo.json").read_text(encoding="utf-8"))
+        values = renderer.resources(cfg)
+        route = values["route.json"]["spec"]["http"][0]
+        matches = [match["uri"] for match in route["match"]]
+
+        def is_routed(path):
+            return any(path == match["exact"] if "exact" in match
+                       else path.startswith(match["prefix"]) for match in matches)
+
+        for path in ("/productpage", "/static/img/izzy.png", "/login", "/logout",
+                     "/api/v1/products", "/api/v1/products/0", "/api/v1/products/0/reviews"):
+            with self.subTest(path=path):
+                self.assertTrue(is_routed(path))
+        for path in ("/", "/health", "/metrics", "/admin", "/productpage-other", "/static-other/file",
+                     "/login-other", "/api/v1/products-other", "/ratings/0"):
+            with self.subTest(path=path):
+                self.assertFalse(is_routed(path))
+        self.assertNotIn({"prefix": "/"}, matches)
+        self.assertEqual(route["route"][0]["destination"], {
+            "host": "productpage.bookinfo.svc.cluster.local", "port": {"number": 9080}})
+        auth = values["authorization.json"]["spec"]["rules"][0]
+        self.assertEqual(auth["from"][0]["source"]["principals"],
+                         ["cluster.local/ns/bookinfo/sa/bookinfo-reviews"])
+        self.assertEqual(auth["to"][0]["operation"], {"methods": ["GET"], "paths": ["/ratings/0"]})
+        network = values["network-policy.json"]["spec"]
+        self.assertEqual(network["podSelector"], {"matchLabels": {"app": "ratings"}})
+        self.assertEqual(network["ingress"][0], {
+            "from": [{"podSelector": {"matchLabels": {"app": "reviews"}}}],
+            "ports": [{"protocol": "TCP", "port": 9080}]})
 
 if __name__ == "__main__":
     unittest.main()
