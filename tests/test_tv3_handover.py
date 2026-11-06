@@ -63,6 +63,29 @@ class HandoverTests(unittest.TestCase):
 
 
 class ServiceEvidenceTests(unittest.TestCase):
+    def test_empty_endpoint_slice_still_writes_failed_selector_evidence(self):
+        # Empty Services can be serialized with null, empty or omitted endpoints.
+        for fields in ({"endpoints": None}, {"endpoints": []}, {}):
+            def fake_json(context, *args):
+                if "service" in args:
+                    return {"metadata": {"name": "target", "uid": "service-uid"}, "spec": {
+                        "type": "ClusterIP", "clusterIP": "10.96.0.1", "selector": {"app": "missing"},
+                        "ports": [{"port": 8081, "targetPort": 9090}]}}
+                if "pods" in args:
+                    return {"items": []}
+                return {"items": [{"metadata": {"name": "empty-slice"}, **fields}]}
+            with self.subTest(fields=fields), tempfile.TemporaryDirectory() as tmp, mock.patch.object(tv3, "guard"), \
+                 mock.patch.object(tv3, "kjson", side_effect=fake_json), contextlib.redirect_stdout(io.StringIO()):
+                cfg = pathlib.Path(tmp) / "input.json"
+                tv3.write_json(cfg, fixtures.config())
+                args = SimpleNamespace(config=cfg, context="offline-mock", output=pathlib.Path(tmp) / "out")
+                self.assertEqual(tv3.service_snapshot(args), 1)
+                report = json.loads((args.output / "service-snapshot.json").read_text(encoding="utf-8"))
+                self.assertFalse(report["checks_passed"])
+                self.assertEqual(report["ready_endpoints"], [])
+                self.assertEqual(report["endpoint_slices"][0]["endpoints"], [])
+                self.assertIn("Service has no verified Ready endpoint", report["errors"])
+
     def test_ready_endpoint_must_match_selected_pod_uid_and_address(self):
         for endpoint_uid, expected_exit in [("pod-uid", 0), ("stale-pod-uid", 1)]:
             def fake_json(context, *args):

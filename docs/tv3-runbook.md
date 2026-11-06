@@ -1,6 +1,6 @@
 # TV3 · Hướng dẫn thực hiện
 
-Cập nhật **06/11/2026**. Mục tiêu là kiểm chứng **DNS Service → selector → EndpointSlice → Pod** và phân biệt thiếu backend với lỗi quyền truy cập. TV3 phụ trách NET01, Istio nền, Prometheus/Kiali, NetworkPolicy SEC03 và bài selector SVC04; phối hợp kiểm tra Service, mTLS, quyền viewer và frontend public. TV1 giữ hạ tầng/Rancher/LB; TV2 giữ ứng dụng/Service/route và luật Istio.
+Cập nhật **07/11/2026**. Mục tiêu là kiểm chứng **DNS Service → selector → EndpointSlice → Pod** và phân biệt thiếu backend với lỗi quyền truy cập. TV3 phụ trách NET01, Istio nền, Prometheus/Kiali, NetworkPolicy SEC03 và bài selector SVC04; phối hợp kiểm tra Service, mTLS, quyền viewer và frontend public. TV1 giữ hạ tầng/Rancher/LB; TV2 giữ ứng dụng/Service/route và luật Istio.
 
 Đọc [bàn giao và checklist đầu vào](tv3-handover.md) để nhận việc, [ma trận test](tv3-test-matrix.md) để chạy từng ca và [trạng thái TV3](evidence/TV3-status.md) để biết kết quả đã xác minh. Lịch M1–M4 theo [kế hoạch](plan.md); có script hoặc test offline chưa đồng nghĩa nghiệm thu cloud. Chưa cần slide trong đợt này.
 
@@ -56,6 +56,10 @@ kubectl --context "$CTX" -n kube-system get pods
 
 `TEN_CONTEXT_LAB` là ô điền, chưa phải context có thể chạy. Đối chiếu [phiên bản/CIDR Calico](../cluster/calico/README.md). Các script cài đặt/NET01 dùng current-context; trước khi chạy phải đối chiếu `kubectl config current-context` đúng `$CTX`. Dùng terminal SSH lab riêng; `|| exit 1` dừng terminal đó nếu lệnh lỗi, giữ forwarding ở terminal khác.
 
+Lượt TV3 ngày 06/11 dùng phiên `sudo` trên cp-01 với `KUBECONFIG=/etc/kubernetes/admin.conf`, context `kubernetes-admin@nt132`. Nếu dùng lại phương thức đã được TV1 cấp, mở shell `sudo -i`, vào thư mục source đã kiểm tra rồi `export KUBECONFIG=/etc/kubernetes/admin.conf`; đối chiếu project/node/context trước thao tác. Không sao chép kubeconfig này về laptop. Phiên này có quyền quản trị, chưa chứng minh quyền viewer/Rancher riêng.
+
+Nếu chỉ `tiers` chờ Tigera API server, xem hướng dẫn bổ sung **riêng APIServer** trong Calico README; không chạy lại bootstrap `03-install-calico.sh` trên cụm đang dùng. Lượt cloud đã kiểm tra Installation và IP pool không đổi sau bổ sung; khả năng dựng cụm mới từ đầu vẫn là phép thử khác.
+
 Khi có phạm vi chạy NET01, trên cp-01:
 
 ```bash
@@ -80,6 +84,8 @@ bash scripts/05-install-istio.sh || exit 1
 kubectl --context "$CTX" -n istio-system get deployments,svc,pods -o wide
 bash scripts/07-install-observability.sh || exit 1
 ```
+
+Đây là bước cài/tích hợp, không cần chạy lại mỗi lần bật VM. Đọc [trạng thái hiện tại](evidence/TV3-status.md) rồi kiểm tra `helm -n istio-system list`, deployment/pods và route trước. Values Istiod 1.30.7 dùng `resources` ở cấp gốc; gateway giữ `targetPort: 80`, NodePort 30080, một replica và tắt autoscaling cho lab. Prometheus được giới hạn requests/limits và retention bằng patch đi kèm; Kiali/Prometheus dùng ClusterIP, truy cập qua tunnel/port-forward. Xem [hướng dẫn quan sát](../observability/README.md).
 
 Nếu thiếu Helm, chuẩn bị trong phiên cloud cùng TV1. Giao TV2 namespace `istio-system`, Service gateway, port/targetPort/NodePort thật và trạng thái Istiod/gateway Ready. TV2 bật injection ở riêng `bookinfo`, rollout workload baseline và áp route theo runbook; không bật injection namespace hệ thống hoặc toàn cluster. Helper `check-bookinfo-pods.py` đọc PodList JSON, kiểm tra bốn app/Pod Ready và proxy thường hoặc native sidecar; thêm `--baseline` khi kiểm tra trước mesh. Không lấy cố định `READY 2/2` làm tiêu chí.
 
@@ -110,3 +116,18 @@ Nguồn `probe` phải là app/debug container có `curl` và `getent`, proxy Re
 Output mặc định trong `.generated/` được Git bỏ qua; đọc/loại thông tin nhạy cảm trước khi chuyển kết quả cần chia sẻ vào `docs/evidence/M1`–`M4`. Dùng [mẫu kết quả](evidence/templates/test-result.md): source/commit hoặc hash gói, thời gian/múi giờ, context, nguồn/đích/SA, lệnh, kỳ vọng/thực tế, policy, rollback và người chạy lại. Chỉ đánh dấu Đạt sau phép thử thực và phục hồi; kết quả offline nằm riêng ở [TV3-status](evidence/TV3-status.md).
 
 Phần trình bày dùng request thật → graph/metric cùng thời gian → Service/endpoint để phân biệt “DNS có tên nhưng không có backend” với “backend Ready nhưng nguồn bị chặn”. Ảnh/video dự phòng phải ghi thời điểm. Thực hiện nhận việc, chuyển source và ký nhận theo [phiếu bàn giao TV3](tv3-handover.md).
+
+## 6. Kết thúc phiên cloud
+
+Lưu evidence về laptop, đối chiếu checksum; kiểm tra policy/replica phục hồi, xóa đúng Service/client thử có UID đã ghi và dừng traffic/debug/forwarding. Giữ mesh, giám sát và route đã bàn giao. Entry ephemeral container đã terminated có thể còn trong Pod cho tới khi Pod được thay tự nhiên.
+
+Dừng worker trước, đợi lệnh hoàn tất rồi mới dừng control plane theo [hướng dẫn bật/tắt lab](bat-tat-lab.md). Trên laptop:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\gcloud-local.ps1 compute instances stop wk-01 wk-02 --project=nt132-kubernetes-513805 --zone=asia-southeast1-a --quiet
+# Chỉ tiếp tục sau khi hai worker dừng thành công:
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\gcloud-local.ps1 compute instances stop cp-01 --project=nt132-kubernetes-513805 --zone=asia-southeast1-a --quiet
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\gcloud-local.ps1 compute instances list --project=nt132-kubernetes-513805 --filter='name=(cp-01 wk-01 wk-02)' --format='table(name,status)'
+```
+
+Chỉ kết thúc khi API xác nhận đủ ba VM `TERMINATED`; stop VM giữ lại disk và cấu hình cụm.

@@ -1,8 +1,14 @@
 # TV3 · Nhận source, đầu vào và bàn giao
 
-Cập nhật **06/11/2026**. Nhánh bàn giao `tv3/istio-network`, source nền `17aaed9`, gồm phần tích hợp Bookinfo và bộ tài liệu TV3 đã gộp. Người nhận ghi commit thực tế sau khi lấy mã. Xem [trạng thái đã kiểm tra](evidence/TV3-status.md); file này là checklist nhận việc, chưa phải ký nhận hay nghiệm thu cloud.
+Cập nhật **07/11/2026**. Nhánh bàn giao `tv3/istio-network`, source nền `17aaed9`, gồm phần tích hợp Bookinfo và bộ tài liệu TV3 đã gộp. Người nhận ghi commit thực tế sau khi lấy mã. Xem [trạng thái đã kiểm tra](evidence/TV3-status.md); file này là checklist nhận việc, chưa phải ký nhận hay nghiệm thu cloud.
 
 Thao tác laptop/cloud ở [runbook TV3](tv3-runbook.md); kỳ vọng, rollback và người chạy lại ở [ma trận test](tv3-test-matrix.md). TV1 giữ hạ tầng/Rancher/LB; TV2 giữ workload/Service/route và luật Istio; TV3 phụ trách mạng, mesh nền, quan sát, NetworkPolicy và bài selector.
+
+**Bản bàn giao ngày 07/11 sau cloud và merge TV2 `8260fc9`:** source gồm Calico APIServer tối thiểu, Istio/giám sát, sửa helper EndpointSlice rỗng, fixture kết nối mới và kết quả kỹ thuật NET01/OBS01/C0–C4/C1b/SVC01–04 cùng phục hồi tại [TV3-status](evidence/TV3-status.md). Chưa có người khác kiểm tra chéo/ký nhận. Lấy commit mới trên nhánh `tv3/istio-network` theo mục 1; bản clone cũ cần cập nhật trước khi đối chiếu. Evidence raw chỉ giữ tại laptop TV3, không nằm trong repo.
+
+Khi mở lại lab, giữ Istio/Prometheus/Kiali và Bookinfo injection/route đã cài; kiểm tra Ready rồi làm tiếp, không bootstrap worker/CNI hoặc apply namespace baseline tắt injection. Policy, Service/client và DestinationRule thử đã dọn, replicas gốc đã phục hồi. Xem [inventory thực](../apps/bookinfo/service-inventory.md), hướng dẫn kết nối mới trong [suite policy](../tests/security/README.md) và trạng thái VM cuối phiên tại TV3-status.
+
+**Cả ba VM đã TERMINATED lúc 00:06:38 ngày 07/11.** Việc nhận tiếp: TV1 kiểm tra viewer/IAM01, review graph và bàn giao frontend PUB01 khi LB sẵn sàng; TV2 đối chiếu inventory/route, chạy lại Service/mTLS/API và NET01; TV3 phối hợp OBS01/NetworkPolicy/selector và lưu ký nhận OPS01. Người chạy lại dùng Pod/UID hiện tại sau khi mở lab, giữ log thất bại và lượt phục hồi; không chép số đo lịch sử thành kết quả mới. Gói evidence nguyên bản ở laptop TV3 cần được rà thông tin trước khi chia sẻ; bản tóm tắt sạch nằm tại TV3-status/inventory.
 
 ## 1. Nhận đúng source
 
@@ -14,7 +20,7 @@ Set-Location NT132-TV3-review
 git rev-parse HEAD
 ```
 
-Thành viên chạy checker theo runbook trước khi tích hợp vào branch của mình. Branch trên GitHub chưa chứa sửa đổi local cho tới khi chúng được commit/push.
+Thành viên chạy checker theo runbook trước khi tích hợp vào branch của mình. Ghi HEAD của bản đã nhận; các sửa đổi local phát sinh về sau chỉ được chia sẻ qua Git sau khi commit/push hoặc qua gói overlay đã kiểm tra.
 
 **Sửa đổi chưa commit:** `git archive HEAD` chỉ lấy commit. Tạo gói source overlay bằng Python đang hoạt động theo runbook:
 
@@ -62,7 +68,7 @@ Khi đưa source lên VM, TV1 dùng archive đúng commit hoặc chuyển chính
 |---|---|
 | Inventory và lịch phiên | Project `nt132-kubernetes-513805`, zone `asia-southeast1-a`, VM cp-01/wk-01/wk-02, IP nội bộ .10/.11/.12; xác nhận cụm Ready và người đang dùng lab. Tên Node có thể là FQDN. |
 | Google IAM và SSH/IAP | Tài khoản riêng, quyền đúng phạm vi; kiểm tra kết nối SSH/firewall/sudo thực tế. Có quyền start/stop vẫn cần phối hợp người đang dùng lab. |
-| Kubernetes/Helm | Context đúng và phiên có quyền cài CRD/resource mesh cấp cluster; quyền đọc policy app/root mesh, log, exec, port-forward; quyền debug/client riêng nếu cần. Chưa có phiên thực được xác nhận. |
+| Kubernetes/Helm | Context đúng và phiên có quyền cài CRD/resource mesh cấp cluster; quyền đọc policy app/root mesh, log, exec, port-forward; quyền debug/client riêng nếu cần. Phiên sudo/admin.conf đã thử ở nhiệm vụ 1, xem trạng thái; quyền Rancher/viewer và RBAC riêng vẫn xác nhận độc lập. |
 | Rancher | User riêng, cluster/project/role đúng; mật khẩu tạm qua kênh riêng. Cluster Member có thể chưa đủ cài Istio. |
 | CA, hostname, tunnel | Chỉ nhận `ca.crt` công khai, đối chiếu CA/hostname trước import; không nhận private key. Chốt hosts/port và người giữ port-forward để tránh trùng phiên. |
 | Thay đổi/rollback | Lịch cài Istio/Prometheus/Kiali, namespace được dùng, policy nền cần giữ, người sở hữu và trạng thái phải phục hồi. |
@@ -76,7 +82,7 @@ Thiết kế Bookinfo đã có tại [apps/bookinfo](../apps/bookinfo/README.md)
 
 | TV2 bàn giao | Điều kiện nhận / dữ liệu runtime còn chờ |
 |---|---|
-| Baseline và nguồn workload | Source/image/tag/license có sẵn; còn kết quả deploy không proxy, DNS/HTTP/nội dung đúng và TV1 review. Ghi imageID/digest thực vào [inventory](../apps/bookinfo/service-inventory.md). |
+| Baseline và nguồn workload | TV3 đã kiểm tra HTTP/nội dung trước mesh; Pod/Service/endpoint và imageID sau injection đã ghi trong [inventory](../apps/bookinfo/service-inventory.md). Còn chờ TV1 review và TV2 đối chiếu/chạy lại độc lập. |
 | Service/Pod/ports | Selector, labels, readiness/resources, Service UID/ClusterIP/port/targetPort, Deployment/replica gốc và EndpointSlice targetRef; ghi tên Pod/UID/IP/node thật. |
 | Hai nguồn trong mesh | Cùng namespace, proxy Ready; khác cả labels và ServiceAccount. Container app/debug đúng Pod có `curl` và `getent`; không exec trong istio-proxy thay nguồn. |
 | API/traffic và luồng hợp lệ | Request không đổi dữ liệu, response/status/nội dung mong đợi; liệt kê mọi nguồn hợp lệ vào target, ingress và metrics. Config tham chiếu đã render local, config vận hành đối chiếu runtime và giữ ngoài Git. |

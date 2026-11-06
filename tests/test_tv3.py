@@ -124,14 +124,14 @@ class TV3Tests(unittest.TestCase):
                 self.assertEqual(report["node_aliases"]["wk-01"], "wk-01.zone.c.project.internal")
 
     def test_probe_requires_a_ready_target_before_accepting_network_block(self):
-        for ready, expected_exit in [(False, 1), (True, 0)]:
+        for ready, expected_exit in [(False, 1), (True, 0), (None, 1)]:
             def fake_json(context, *args):
                 if "pod" in args:
                     return {"metadata": {"uid": "offline-uid", "labels": {"app": "control"}},
                             "spec": {"serviceAccountName": "control", "containers": [{"name": "debug"}, {"name": "istio-proxy"}]},
                             "status": {"containerStatuses": [{"name": "istio-proxy", "ready": True}]}}
                 if "endpointslices" in args:
-                    return {"items": [{"metadata": {"name": "target-slice"}, "endpoints": [
+                    return {"items": [{"metadata": {"name": "target-slice"}, "endpoints": None if ready is None else [
                         {"conditions": {"ready": ready}, "addresses": ["10.244.1.1"]}]}]}
                 return {"items": []}
 
@@ -146,7 +146,7 @@ class TV3Tests(unittest.TestCase):
                                        expect="network-block", output=pathlib.Path(tmp) / "probe")
                 self.assertEqual(tv3.probe(args), expected_exit)
                 report = json.loads((args.output / "probe.json").read_text(encoding="utf-8"))
-                self.assertEqual(report["matched_expectation"], ready)
+                self.assertEqual(report["matched_expectation"], bool(ready))
                 self.assertIn("namespace_policies", report)
 
     def test_traffic_records_http_failure_and_nonzero_exit(self):

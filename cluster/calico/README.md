@@ -1,6 +1,6 @@
 # Calico · Bảng thiết kế và phiên bản của TV3
 
-Ngày đối chiếu tài liệu chính thức: **05/11/2026**. Giữ nguyên pins của repo, chưa nâng cấp thành phần.
+Ngày đối chiếu bảng phiên bản trước triển khai: **05/11/2026**. Giữ nguyên pins của repo. Bảng dưới mô tả source và các kiểm tra cần thực hiện; kết quả cloud hiện tại nằm trong [TV3-status](../../docs/evidence/TV3-status.md).
 
 | Thành phần | Source hiện tại | Đối chiếu / việc còn phải đo |
 |---|---|---|
@@ -38,9 +38,38 @@ sysctl net.ipv4.ip_forward net.bridge.bridge-nf-call-iptables
 sudo systemctl is-active containerd kubelet
 ```
 
+## API quản trị Calico
+
+`apiserver.yaml` chỉ tạo `APIServer/default` với `spec: {}` để operator cung cấp API Calico `v3.projectcalico.org`, phục vụ các thành phần quản trị như `tiers`. Đây là API bổ sung, tách biệt với Kubernetes API server trên cp-01. Manifest không thay đổi `Installation`, IP pool hoặc cài Goldmane/Whisker. CNI/Pod networking đạt chưa đủ để kết luận mọi `tigerastatus` đều khỏe.
+
+Với cụm đã chạy, kiểm tra trước; không chạy lại toàn bộ script cài CNI để bổ sung API:
+
+```bash
+kubectl get installation default -o yaml
+kubectl get ippools.crd.projectcalico.org -o yaml
+kubectl get apiservers.operator.tigera.io default --ignore-not-found -o yaml
+kubectl get tigerastatus
+```
+
+Nếu `APIServer/default` đã tồn tại, giữ cấu hình hiện có và kiểm tra lỗi operator/APIService. Nếu chưa có, chỉ áp manifest tối thiểu rồi chờ các điều kiện; không áp nguyên `custom-resources.yaml` upstream vì nó còn chứa cấu hình Installation/IP pool khác:
+
+```bash
+kubectl apply -f cluster/calico/apiserver.yaml
+for component in apiserver tiers; do
+  kubectl wait --for=create "tigerastatus/$component" --timeout=300s
+  for condition in Available=True Progressing=False Degraded=False; do
+    kubectl wait --for="condition=$condition" "tigerastatus/$component" --timeout=300s
+  done
+done
+kubectl wait --for=create apiservice/v3.projectcalico.org --timeout=300s
+kubectl wait --for=condition=Available=True apiservice/v3.projectcalico.org --timeout=300s
+```
+
+Đối chiếu lại `Installation`/IP pool và chạy NET01 sau thay đổi. Manifest tối thiểu theo [Calico v3.33.0](https://raw.githubusercontent.com/projectcalico/calico/v3.33.0/manifests/custom-resources.yaml).
+
 Kiểm tra trên cp-01:
 
-Script `03-install-calico.sh` hiện chờ `tigerastatus/calico` có `Available=True`, `Progressing=False`, `Degraded=False`, với timeout cho từng điều kiện; không chỉ in trạng thái rồi báo thành công. Các component khác trong `tigerastatus` vẫn phải được đối chiếu trước bàn giao và trong snapshot TV3.
+Script `03-install-calico.sh` cài mới cả CNI và API quản trị tối thiểu, chờ `calico`, `apiserver`, `tiers` có `Available=True`, `Progressing=False`, `Degraded=False`, đồng thời chờ APIService `v3.projectcalico.org` Available. Mỗi điều kiện có timeout; lỗi khiến script dừng. Các component khác trong `tigerastatus` vẫn phải được đối chiếu trước bàn giao và trong snapshot TV3.
 
 ```bash
 kubectl get nodes -o wide

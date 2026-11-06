@@ -280,7 +280,7 @@ def service_snapshot(args):
     errors = []
     ready_endpoints = []
     for item in slices:
-        for endpoint in item.get("endpoints", []):
+        for endpoint in item.get("endpoints") or []:
             if endpoint.get("conditions", {}).get("ready") is not True:
                 continue
             ref = endpoint.get("targetRef", {})
@@ -299,7 +299,7 @@ def service_snapshot(args):
               "namespace": cfg["namespace"], "service": {"name": name, "uid": svc["metadata"]["uid"],
                   "type": svc["spec"].get("type"), "cluster_ip": svc["spec"].get("clusterIP"), "selector": selector,
                   "ports": svc["spec"].get("ports", [])}, "pods": summaries, "ready_endpoints": ready_endpoints,
-              "endpoint_slices": [{"name": e["metadata"]["name"], "endpoints": e.get("endpoints", []),
+              "endpoint_slices": [{"name": e["metadata"]["name"], "endpoints": e.get("endpoints") or [],
                                     "ports": e.get("ports", [])} for e in slices],
               "checks_passed": not errors, "errors": errors,
               "note": "Capture before/after TV2 restart/scale or SVC04 repair; HTTP/DNS and peer verification still required"}
@@ -429,7 +429,7 @@ def probe(args):
     endpoints = kjson(args.context, "-n", cfg["namespace"], "get", "endpointslices",
                       "-l", "kubernetes.io/service-name=" + cfg["target_service"])
     has_ready_endpoint = any(e.get("conditions", {}).get("ready") is True
-                             for s in endpoints["items"] for e in s.get("endpoints", []))
+                             for s in endpoints["items"] for e in (s.get("endpoints") or []))
     prefix = ["-n", cfg["namespace"], "exec", args.pod, "-c", args.container, "--"]
     dns = kubectl(args.context, *prefix, "getent", "hosts", host)
     result = kubectl(args.context, *prefix, "curl", "--noproxy", "*", "-sS", "--max-time", "10", "-o", "/dev/null", "-w", "%{http_code}", url)
@@ -441,7 +441,7 @@ def probe(args):
               "url": url, "expected": args.expect, "dns": dns, "response": result,
               "namespace_policies": policies,
               "mesh_root_namespace": root_namespace, "root_policies": root_policies, "evidence_errors": evidence_errors,
-              "endpoint_slices": [{"name": e["metadata"]["name"], "endpoints": e.get("endpoints", []),
+              "endpoint_slices": [{"name": e["metadata"]["name"], "endpoints": e.get("endpoints") or [],
                                     "ports": e.get("ports", [])} for e in endpoints["items"]],
               "target_has_ready_endpoint": has_ready_endpoint,
               "matched_expectation": not evidence_errors and has_ready_endpoint and probe_match(args.expect, dns, result),

@@ -90,7 +90,7 @@ def resources(cfg):
         rules.append({
             "from": [{
                 "namespaceSelector": {"matchLabels": {"kubernetes.io/metadata.name": "istio-system"}},
-                "podSelector": {"matchLabels": {"app": "prometheus"}},
+                "podSelector": {"matchLabels": {"app.kubernetes.io/name": "prometheus"}},
             }],
             "ports": [{"protocol": "TCP", "port": 15020}, {"protocol": "TCP", "port": 15090}],
         })

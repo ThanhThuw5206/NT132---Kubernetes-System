@@ -2,6 +2,8 @@
 
 Người thực hiện: TV2. Branch `tv2/kubernetes-service` @ `2782c61`. Thao tác trên cụm cloud `nt132-kubernetes-513805`, zone `asia-southeast1-a`.
 
+**Nhật ký lịch sử trước mesh:** kết quả phiên này được đưa lên GitHub tại `8260fc9`. Các lệnh và số đo bên dưới mô tả thời điểm TV2 thực hiện ngày 06/11, không phải hướng dẫn tiếp tục trên trạng thái hiện tại. Sau đó TV3 đã cài mesh/giám sát, bật injection/route và thực hiện các lượt policy/Service; xem [TV3-status](TV3-status.md) và [inventory](../../apps/bookinfo/service-inventory.md). Không chạy lại manifest baseline injection disabled trên cụm đã tích hợp. Lượt kỹ thuật TV3 sau đó không thay chữ ký kiểm tra chéo của thành viên.
+
 **Phạm vi đã làm:** kết nối cụm, deploy Bookinfo **baseline (chưa có Istio/sidecar)**, kiểm chứng Service SVC01/SVC02/SVC03, rồi tắt VM. **Chưa làm** (cần TV3 cài Istio): injection/route qua gateway (APP01 đầy đủ), SEC01 (mTLS), SEC02 (AuthorizationPolicy), NodePort→LB.
 
 **Lưu ý trung thực:** các kết quả dưới đây do **TV2 tự chạy một mình**; theo quy ước nhóm cần **kiểm tra chéo** (SVC01: TV1; SVC02/SVC03: TV3) trước khi coi là nghiệm thu chính thức. Không có Secret/token/kubeconfig trong file này.
@@ -9,14 +11,14 @@ Người thực hiện: TV2. Branch `tv2/kubernetes-service` @ `2782c61`. Thao t
 ## 1. Chuẩn bị môi trường (laptop Windows)
 
 - Cài **Google Cloud CLI portable** 592.0.0 qua `scripts/install-gcloud-local.ps1` (gọi bằng `.\scripts\gcloud-local.ps1`).
-- `gcloud auth login` (`1ottie1846@gmail.com`), project `nt132-kubernetes-513805`.
-- OS Login profile hoạt động: user Linux `usr_1ottie1846_gmail_com`, khóa `~/.ssh/google_compute_engine` đã nạp.
+- `gcloud auth login` bằng tài khoản được TV1 cấp quyền, project `nt132-kubernetes-513805`; không lưu email cá nhân trong nhật ký chia sẻ.
+- OS Login profile hoạt động: user Linux của tài khoản TV2, khóa `~/.ssh/google_compute_engine` đã nạp. `TEN_OS_LOGIN` trong ví dụ đã thay tên cá nhân, không phải giá trị nhập nguyên văn.
 - **Vấn đề gặp và cách xử lý:**
   - `gcloud compute ssh` qua PuTTY báo *Remote side unexpectedly closed* → thực chất do cp-01 lúc đó đang tắt (IAP `4003 failed to connect to backend port 22`). Sau khi TV1 bật cụm thì hết.
   - OpenSSH báo *bad permissions* trên khóa → siết ACL: `icacls ... /inheritance:r /grant:r "USER:R"` → chỉ còn `MSI\USER:(R)`.
 - **Cách kết nối dùng được (2 terminal):**
   1. Tunnel: `.\scripts\gcloud-local.ps1 compute start-iap-tunnel cp-01 22 --local-host-port=localhost:2222 --project=nt132-kubernetes-513805 --zone=asia-southeast1-a` → `Listening on port [2222].`
-  2. SSH: `ssh -i $env:USERPROFILE\.ssh\google_compute_engine -o StrictHostKeyChecking=accept-new -p 2222 usr_1ottie1846_gmail_com@localhost`
+  2. SSH: `ssh -i $env:USERPROFILE\.ssh\google_compute_engine -o StrictHostKeyChecking=accept-new -p 2222 TEN_OS_LOGIN@localhost`
 - TV2 không có kubeconfig riêng → dùng `sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf ...` trên cp-01.
 
 ## 2. Trạng thái cụm khi vào
@@ -102,7 +104,9 @@ Replica gốc = 1. Scale lên 2 rồi về 1.
 
 `gcloud compute instances stop wk-01 wk-02` rồi `stop cp-01` → cả 3 **TERMINATED**. App nằm trong etcd (disk) nên bật lại vẫn còn, **không phải deploy lại**.
 
-## 9. Việc còn lại (buổi sau)
+## 9. Kế hoạch để lại khi kết thúc phiên TV2 (lịch sử)
+
+Danh sách này được giữ để truy vết bàn giao lúc chưa có mesh. Phần cài mesh, injection/route, các lượt kỹ thuật SEC và NodePort đã được TV3 làm sau đó; công việc hiện tại và phần chờ thành viên chạy lại ghi tại [TV2-status](TV2-status.md) và [TV3-status](TV3-status.md).
 
 1. **TV3 cài Istio** (`istio-system`, gateway NodePort 30080).
 2. TV2: bật injection namespace `bookinfo` + rollout → **APP01 qua gateway**; áp Gateway/VirtualService (route `/productpage`).

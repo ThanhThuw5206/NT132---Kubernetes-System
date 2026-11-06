@@ -6,7 +6,7 @@ Manifest thật được tạo bởi `python3 scripts/tv3.py render config/appli
 |---|---|---|---|
 | Pod khớp `allowed_caller_labels`, cùng namespace | Pod khớp `target_labels` | TCP `target_port` của Pod | Cho phép luồng nghiệp vụ |
 | Pod khác nhãn hoặc namespace khác | Cùng target | Cổng ứng dụng | Không được luật này cho phép |
-| Pod `app=prometheus` **và** namespace `istio-system` | Cùng target | TCP 15020, 15090 | Cho scrape khi `permit_prometheus_scrape=true` |
+| Pod `app.kubernetes.io/name=prometheus` **và** namespace `istio-system` | Cùng target | TCP 15020, 15090 | Cho scrape khi `permit_prometheus_scrape=true`; khớp nhãn addon Istio 1.30.7 |
 | Gateway trực tiếp tới target | Cùng target | Cổng ứng dụng | Không được mở riêng; target phải là dịch vụ nội bộ sau entry theo thiết kế hiện tại |
 
 Luật chỉ giới hạn ingress tại target, không phải default-deny toàn namespace hoặc egress policy. DNS của nguồn không bị luật ingress này chủ động giới hạn. Cổng Pod (`target_port`) có thể khác cổng Service (`target_service_port`); không hoán đổi hai giá trị.

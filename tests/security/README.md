@@ -54,6 +54,26 @@ probe_pair() {
 
 Mỗi `probe.json` có phase, context, namespace, Pod UID/IP/node/labels/ServiceAccount, DNS, response/exit code, policy ứng dụng/root namespace mesh và EndpointSlice target cùng thời điểm; kèm commit nền và hash script local. Root namespace mặc định là `istio-system`, đổi bằng `--mesh-root-namespace` nếu nhóm đổi thiết kế. Nếu không đọc được policy cần thiết, report ghi `evidence_errors` và không báo khớp kỳ vọng. Không thu Secret/env/kubeconfig. Các policy toàn cụm của CNI hoặc egress khác ngoài hai namespace vẫn cần đối chiếu với người quản trị khi có. `matched_expectation` chỉ là kết quả khớp phép thử, chưa tự đánh dấu SEC03 đạt.
 
+## Kiểm soát kết nối cũ trước C0–C4
+
+Proxy có thể tái sử dụng kết nối TCP đã được cho phép trước lúc thêm NetworkPolicy. Kubernetes để việc áp thay đổi lên kết nối đang tồn tại tùy implementation; một request mới không nhất thiết tạo kết nối upstream mới. Không kết luận CNI hỏng chỉ từ HTTP 200 trên kết nối cũ. [Quy định về kết nối đang tồn tại](https://kubernetes.io/docs/concepts/services-networking/network-policies/#networkpolicy-and-existing-connections).
+
+Lượt Bookinfo ngày 06/11 đã gặp hiện tượng C3 vẫn 200; lượt giữ điều kiện kết nối mới cố định từ trước C0 tới sau C4 cho kết quả khác. Để chạy lại cùng điều kiện, đọc DestinationRule hiện có trước, chỉ dùng fixture sau với `bookinfo`/`ratings` đúng thiết kế. Đây là cấu hình **thử tạm**, không phải luật nghiệp vụ cần giữ trên cluster:
+
+```bash
+test "$APP_NAMESPACE" = bookinfo || exit 1
+"${K[@]}" get destinationrules
+export FRESH_RULE=tv3-test-fresh-ratings-connections
+# create từ chối tên đã tồn tại; không dùng apply ghi đè luật của người khác.
+export FRESH_UID="$("${K[@]}" create -f tests/security/fresh-connections.bookinfo.yaml -o jsonpath='{.metadata.uid}')"
+test -n "$FRESH_UID" || exit 1
+# Đợi proxy nhận cấu hình, rồi lấy baseline trước STRICT:
+sleep 5
+probe_pair C0 200
+```
+
+Fixture giới hạn mỗi kết nối một request và thời gian một giây; ghi manifest/UID vào evidence và chỉ tiếp tục khi C0 hai nguồn cùng 200. Giữ nguyên fixture xuyên suốt các ca và phục hồi; vẫn cần lưu DNS/endpoint/log, không đổi matcher thành HTTP 503 để tự nhận đạt. Xóa fixture ở cuối quy trình bên dưới, sau các ca C1–C4.
+
 ## C1 · Đối chứng STRICT
 
 ```bash
@@ -118,3 +138,12 @@ probe_pair final-recovered 200
 ```
 
 Giữ STRICT nếu đó là trạng thái nhóm đã thống nhất. Nếu STRICT cũng chỉ được tạo cho buổi thử và cần trả về trạng thái trước C1, gỡ riêng `mtls.json` sau khi lưu evidence/phục hồi. Không xóa namespace, không xóa toàn bộ policy bằng `--all`. Nếu một ca dừng giữa chừng, kiểm tra luật đang tồn tại rồi dùng đúng lệnh hoàn tác ở trên.
+
+Nếu đã tạo fixture kết nối mới từ đầu, sau khi các policy thử đã gỡ và cả hai nguồn phục hồi, đối chiếu UID rồi xóa riêng fixture:
+
+```bash
+test -n "${FRESH_UID:-}" || exit 1
+test "$("${K[@]}" get destinationrule "$FRESH_RULE" -o jsonpath='{.metadata.uid}')" = "$FRESH_UID" || exit 1
+"${K[@]}" delete destinationrule "$FRESH_RULE"
+probe_pair final-without-connection-fixture 200
+```

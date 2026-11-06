@@ -1,6 +1,8 @@
 # TV3 · Ma trận kiểm thử và bằng chứng
 
-Soạn trên laptop ngày **05/11/2026**, cập nhật Bookinfo **06/11/2026** theo [phân công TV1](them-thanh-vien.md) và [kế hoạch](plan.md). **Các dòng dưới là kế hoạch, chưa phải kết quả cloud.** Giá trị thiết kế đã có; điền Pod/UID/endpoint và kết quả thật từ [phiếu ứng dụng](application-handover.md) trước khi chạy. Dùng [mẫu kết quả](evidence/templates/test-result.md) cho từng lượt; giữ log lỗi và lượt phục hồi.
+Soạn trên laptop ngày **05/11/2026**, cập nhật Bookinfo **06/11/2026** theo [phân công TV1](them-thanh-vien.md) và [kế hoạch](plan.md). **Các dòng dưới là tiêu chí và cách chạy lại, không phải bảng kết quả.** Kết quả cloud mới nhất ghi tại [TV3-status](evidence/TV3-status.md). Điền Pod/UID/endpoint và kết quả thật từ [phiếu ứng dụng](application-handover.md) trước mỗi lượt. Dùng [mẫu kết quả](evidence/templates/test-result.md); giữ log lỗi và lượt phục hồi.
+
+NET01 đã chạy thực ngày 06/11, đạt kỹ thuật 6/6 HTTP 200 và đã dọn fixture; còn chờ TV2 kiểm tra chéo. Kết quả và trạng thái VM cuối buổi chỉ ghi tại [TV3-status](evidence/TV3-status.md); các hàng dưới vẫn là tiêu chí để chạy lại.
 
 ## 1. Tên dùng trong ma trận
 
@@ -30,7 +32,7 @@ Kiểm tra baseline trước mesh là một bước riêng, **chưa phải C0** 
 
 ## 3. C0–C4: cùng một request, đổi riêng lớp đang thử
 
-Các ca HTTP dưới dùng GET `TEST_PATH` tới `TARGET_SERVICE:TARGET_SERVICE_PORT`, trừ khi dòng ghi rõ URL khác. Trạng thái mặc định của toàn bộ ma trận: **Chưa chạy trên cloud**.
+Các ca HTTP dưới dùng GET `TEST_PATH` tới `TARGET_SERVICE:TARGET_SERVICE_PORT`, trừ khi dòng ghi rõ URL khác. Tách kết quả kỹ thuật của người chạy với việc thành viên khác kiểm tra chéo; không điền tên người chạy lại khi chưa có.
 
 | Ca / chủ trì → người chạy lại | Nguồn → đích / port / method-path | Điều kiện đầu và lớp thay đổi | Kỳ vọng và bằng chứng phải lưu | Hoàn tác / kiểm tra phục hồi |
 |---|---|---|---|---|

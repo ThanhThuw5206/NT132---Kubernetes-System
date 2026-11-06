@@ -1,0 +1,6 @@
+# Add only the aggregated Calico API; preserve the existing Installation/IP pool.
+apiVersion: operator.tigera.io/v1
+kind: APIServer
+metadata:
+  name: default
+spec: {}

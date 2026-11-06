@@ -22,7 +22,9 @@
 | scripts/ | Script thao tác có phạm vi rõ ràng và hướng dẫn chạy. |
 | docs/ | Kế hoạch, hướng dẫn, inventory và bằng chứng đã loại thông tin nhạy cảm. |
 
-Repository đã có Terraform tạo ba VM, script bootstrap kubeadm/Calico, Helm values cho Rancher/Istio và script dashboard. Theo cập nhật của TV1 ngày 05/11/2026, cụm ba node đã được kiểm chứng Ready, Kubernetes Service/DNS hoạt động và Rancher hiển thị đủ ba node Active. Xác nhận inventory hiện có với TV1 trước khi tạo tài nguyên. Ứng dụng do TV2 lựa chọn: **đã chốt Bookinfo**, bổ sung manifest/config tham chiếu trong `apps/bookinfo/`, bảng kê Service `apps/bookinfo/service-inventory.md` và runbook thao tác `docs/tv2-runbook.md`. **Ngày 06/11/2026 TV2 đã deploy Bookinfo baseline lên cụm và kiểm chứng APP01(baseline)/SVC01/SVC02/SVC03 đạt** (nhật ký: `docs/evidence/TV2-baseline-20261106.md`); phần cần Istio (injection/route, SEC01/SEC02, NodePort→LB) chờ TV3 cài Istio và kiểm tra chéo.
+Repository đã có Terraform tạo ba VM, script bootstrap kubeadm/Calico, Helm values cho Rancher/Istio và script dashboard. Theo cập nhật của TV1 ngày 05/11/2026, cụm ba node đã được kiểm chứng Ready, Kubernetes Service/DNS hoạt động và Rancher hiển thị đủ ba node Active. Xác nhận inventory hiện có với TV1 trước khi tạo tài nguyên. Ứng dụng do TV2 lựa chọn: **Bookinfo**, với manifest/config trong `apps/bookinfo/`, [inventory](apps/bookinfo/service-inventory.md) và [runbook TV2](docs/tv2-runbook.md).
+
+**Tiến độ đối chiếu ngày 07/11/2026:** TV2 đã deploy baseline và ghi kết quả kỹ thuật APP01/SVC01–03 trong [nhật ký 06/11](docs/evidence/TV2-baseline-20261106.md), đưa lên GitHub tại `8260fc9`. Sau đó TV3 đã cài Istio/Prometheus/Kiali, bật injection/route, thử NodePort hai worker, policy và Service cùng các lượt phục hồi; xem [TV3-status](docs/evidence/TV3-status.md). Còn chờ kiểm tra chéo độc lập của các thành viên, viewer và frontend LB. Nhật ký baseline là lịch sử trước mesh; không apply lại namespace injection disabled hoặc dựng lại cụm đang có. Cả ba VM đã được xác nhận TERMINATED lúc 00:06:38 ngày 07/11 trong bằng chứng TV3.
 
 **Bắt đầu tại [hướng dẫn triển khai cloud](docs/deploy-cloud.md)**: có từng lệnh chạy tại Cloud Shell, VM và Windows, kiểm tra sau mỗi giai đoạn, lịch năm ngày và cách dọn tài nguyên. Đây là nguồn hướng dẫn thao tác cho bộ config hiện tại; không chạy xen kẽ lệnh tạo hạ tầng trong tài liệu cũ.
 
@@ -30,7 +32,7 @@ Phiên bản được ghim tại `config/versions.env`. Điền project trong `i
 
 Thông số ứng dụng nhập qua `config/application.json` theo file example. `scripts/render-application.py` kiểm tra thông số rồi tạo route và policy riêng cho lần chạy. Không apply cả thư mục kết quả; làm theo thứ tự trong hướng dẫn để kiểm chứng từng lớp.
 
-Phần Bookinfo chuẩn bị trên laptop ngày 06/11 có source upstream kèm hash/giấy phép và `scripts/prepare-bookinfo.py` để sinh workload baseline không injection, probes/tài nguyên và reviews-v2. Sau baseline được review mới tích hợp Istio/injection/route rồi thử policy từng lớp. Xem [kết quả local và việc còn chờ](docs/evidence/TV3-status.md); chưa dùng những kết quả offline này để nghiệm thu cloud. Renderer hỗ trợ tùy chọn `public_http_matches` cho các path website cụ thể, giữ `public_path_prefix` cho config cũ.
+Phần Bookinfo chuẩn bị trên laptop ngày 06/11 có source upstream kèm hash/giấy phép và `scripts/prepare-bookinfo.py` để sinh workload baseline không injection, probes/tài nguyên và reviews-v2. Quy trình dựng mới đi từ baseline được review tới Istio/injection/route rồi thử policy từng lớp. Xem [kết quả local/cloud và việc còn chờ](docs/evidence/TV3-status.md); kết quả offline được ghi riêng với các lượt cloud. Renderer hỗ trợ tùy chọn `public_http_matches` cho các path website cụ thể, giữ `public_path_prefix` cho config cũ.
 
 ## Tài liệu bắt đầu
 

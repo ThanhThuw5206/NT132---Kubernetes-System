@@ -1,3 +1,7 @@
+# A fixed replica avoids HPA metrics dependencies in the small lab.
+replicaCount: 1
+autoscaling:
+  enabled: false
 service:
   type: NodePort
   externalTrafficPolicy: Cluster

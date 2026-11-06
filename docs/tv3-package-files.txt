@@ -14,12 +14,14 @@ apps/bookinfo/upstream/bookinfo.list.json
 apps/bookinfo/upstream/LICENSE
 cluster/calico/README.md
 cluster/calico/installation.yaml
+cluster/calico/apiserver.yaml
 docs/application-handover.md
 docs/deploy-cloud.md
 docs/bat-tat-lab.md
 docs/them-thanh-vien.md
 docs/tv2-runbook.md
 docs/evidence/TV2-status.md
+docs/evidence/TV2-baseline-20261106.md
 docs/tv3-runbook.md
 docs/tv3-test-matrix.md
 docs/tv3-handover.md
@@ -30,6 +32,7 @@ mesh/istio/gateway-values.yaml
 mesh/istio/istiod-values.yaml
 network/policies/README.md
 observability/README.md
+observability/prometheus-lab-patch.json
 scripts/lib.sh
 scripts/cluster-nodes.py
 scripts/01-prepare-node.sh
@@ -51,6 +54,7 @@ scripts/gcloud-local.ps1
 tests/service/network-check.yaml
 tests/service/README.md
 tests/security/README.md
+tests/security/fresh-connections.bookinfo.yaml
 tests/test_application_renderer.py
 tests/test_bookinfo_preparation.py
 tests/test_bookinfo_readiness.py

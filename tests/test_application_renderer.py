@@ -36,9 +36,13 @@ class ApplicationRendererTests(unittest.TestCase):
 
     def test_metrics_exception_requires_both_namespace_and_pod_selector(self):
         rules = renderer.resources(self.cfg)["network-policy.json"]["spec"]["ingress"]
-        source = rules[1]["from"][0]
-        self.assertIn("namespaceSelector", source)
-        self.assertIn("podSelector", source)
+        self.assertEqual(rules[1], {
+            "from": [{
+                "namespaceSelector": {"matchLabels": {"kubernetes.io/metadata.name": "istio-system"}},
+                "podSelector": {"matchLabels": {"app.kubernetes.io/name": "prometheus"}},
+            }],
+            "ports": [{"protocol": "TCP", "port": 15020}, {"protocol": "TCP", "port": 15090}],
+        })
         self.cfg["permit_prometheus_scrape"] = False
         self.assertEqual(len(renderer.resources(self.cfg)["network-policy.json"]["spec"]["ingress"]), 1)
 

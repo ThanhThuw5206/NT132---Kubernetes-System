@@ -2,6 +2,22 @@
 
 Cần mạng nền đạt, Istiod/gateway Ready, workload có sidecar và route do TV2 bàn giao. Cài addon bằng `bash scripts/07-install-observability.sh` trên cp-01. TV1 hoặc TV3 mở port-forward và tunnel theo [runbook TV3](../docs/tv3-runbook.md).
 
+## Cấu hình addon cho lab 3 VM
+
+Script dùng addon chính thức của Istio **1.30.7**, sau đó áp dụng [patch Prometheus](prometheus-lab-patch.json) trước khi chờ rollout. Script dừng nếu đổi phiên bản Istio để nhóm rà lại patch. Các giá trị sau áp dụng cho container `prometheus-server`:
+
+| Cấu hình | Giá trị |
+|---|---|
+| Requests CPU / RAM | `250m` / `256Mi` |
+| Limits CPU / RAM | `1` CPU / `1Gi` |
+| Retention thời gian / dung lượng TSDB | `24h` / `256MB` |
+
+Retention là chính sách giữ dữ liệu TSDB; `256MB` không phải giới hạn cứng cho toàn bộ volume `emptyDir`. Sao lưu evidence cần giữ trước khi xóa Pod hoặc cài lại addon.
+
+Ngoại lệ NetworkPolicy cho scrape phải khớp Pod trong namespace `istio-system` **và** nhãn `app.kubernetes.io/name=prometheus`, cho phép TCP `15020`/`15090` ở workload đích. Addon phiên bản này không gắn nhãn `app=prometheus`; dùng nhãn đó sẽ không khớp scraper. Kiểm tra annotation/cổng metrics thực tế của Pod và Prometheus targets trước khi kết luận scrape hoạt động.
+
+Kiali dùng Service `ClusterIP`, giao diện tại `http://localhost:20001/kiali/` sau khi mở tunnel/port-forward. Addon mẫu dùng xác thực `anonymous` và ServiceAccount có quyền ghi một số tài nguyên Kubernetes/Istio; không dùng Kiali này làm bằng chứng tài khoản viewer chỉ đọc cho IAM01. Giữ truy cập qua tunnel/port-forward theo runbook.
+
 ## Tạo traffic có timestamp
 
 Chạy trên laptop có Python hoặc cp-01 đang có port-forward gateway:
@@ -12,7 +28,7 @@ python3 scripts/tv3.py traffic http://127.0.0.1:8080/DUONG_DAN_THAT --duration 1
 
 Thay đường dẫn bằng request TV2 xác nhận tạo được luồng caller → target. Công cụ ngừng bắt đầu request mới sau thời lượng đã chọn, ghi từng HTTP status/lỗi và thời điểm theo UTC+07:00 vào `.generated/tv3-*/traffic.json`. `--timeout` là thời gian chờ khi socket không nhận dữ liệu; response gửi chậm liên tục có thể kéo dài hơn thời lượng + timeout. Có thể Ctrl+C để dừng, log vẫn được lưu và đánh dấu chưa hoàn tất. Không tự follow redirect hoặc lưu response body; đọc tối đa 1 MiB để kiểm tra body, đánh dấu lỗi nếu bị cắt, framing sai hoặc lớn hơn giới hạn. Từ chối URL có credential/query/fragment. Chọn API GET không có tác dụng sửa dữ liệu. Exit 0 chỉ khi vòng chạy hoàn tất, có request và tất cả trả 200/body hợp lệ; vẫn phải xem nội dung trang thật và metric để nghiệm thu OBS01.
 
-Trong Kiali (`http://localhost:20001`): chọn namespace thật, cửa sổ 5 phút, graph workload/service. Ghi tên nguồn/đích, request rate, giờ bắt đầu/kết thúc và ảnh cạnh caller → target. Nhờ TV1 phát request mới rồi tự tìm lại cạnh. Không mặc định tên `reviews`/`ratings` nếu TV2 chọn app khác.
+Trong Kiali (`http://localhost:20001/kiali/`): chọn namespace thật, cửa sổ 5 phút, graph workload/service. Ghi tên nguồn/đích, request rate, giờ bắt đầu/kết thúc và ảnh cạnh caller → target. Nhờ TV1 phát request mới rồi tự tìm lại cạnh. Không mặc định tên `reviews`/`ratings` nếu TV2 chọn app khác.
 
 ## Đối chiếu Prometheus
 
