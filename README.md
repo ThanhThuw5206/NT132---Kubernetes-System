@@ -22,7 +22,7 @@
 | scripts/ | Script thao tác có phạm vi rõ ràng và hướng dẫn chạy. |
 | docs/ | Kế hoạch, hướng dẫn, inventory và bằng chứng đã loại thông tin nhạy cảm. |
 
-Repository đã có Terraform tạo ba VM, script bootstrap kubeadm/Calico, Helm values cho Rancher/Istio và script dashboard. Theo cập nhật của TV1 ngày 05/11/2026, cụm ba node đã được kiểm chứng Ready, Kubernetes Service/DNS hoạt động và Rancher hiển thị đủ ba node Active. Xác nhận inventory hiện có với TV1 trước khi tạo tài nguyên. Ứng dụng do TV2 lựa chọn: **đã chốt Bookinfo**, bổ sung manifest/config tham chiếu trong `apps/bookinfo/`, bảng kê Service `apps/bookinfo/service-inventory.md` và runbook thao tác `docs/tv2-runbook.md`; triển khai lên cụm (deploy, SVC/SEC) là bước kế tiếp.
+Repository đã có Terraform tạo ba VM, script bootstrap kubeadm/Calico, Helm values cho Rancher/Istio và script dashboard. Theo cập nhật của TV1 ngày 05/11/2026, cụm ba node đã được kiểm chứng Ready, Kubernetes Service/DNS hoạt động và Rancher hiển thị đủ ba node Active. Xác nhận inventory hiện có với TV1 trước khi tạo tài nguyên. Ứng dụng do TV2 lựa chọn: **đã chốt Bookinfo**, bổ sung manifest/config tham chiếu trong `apps/bookinfo/`, bảng kê Service `apps/bookinfo/service-inventory.md` và runbook thao tác `docs/tv2-runbook.md`. **Ngày 06/11/2026 TV2 đã deploy Bookinfo baseline lên cụm và kiểm chứng APP01(baseline)/SVC01/SVC02/SVC03 đạt** (nhật ký: `docs/evidence/TV2-baseline-20261106.md`); phần cần Istio (injection/route, SEC01/SEC02, NodePort→LB) chờ TV3 cài Istio và kiểm tra chéo.
 
 **Bắt đầu tại [hướng dẫn triển khai cloud](docs/deploy-cloud.md)**: có từng lệnh chạy tại Cloud Shell, VM và Windows, kiểm tra sau mỗi giai đoạn, lịch năm ngày và cách dọn tài nguyên. Đây là nguồn hướng dẫn thao tác cho bộ config hiện tại; không chạy xen kẽ lệnh tạo hạ tầng trong tài liệu cũ.
 
@@ -41,6 +41,7 @@ Phần Bookinfo chuẩn bị trên laptop ngày 06/11 có source upstream kèm h
 - [TV2: runbook triển khai Kubernetes Service (Bookinfo)](docs/tv2-runbook.md)
 - [TV2: ứng dụng Bookinfo — nguồn, giấy phép và bảng kê Service](apps/bookinfo/README.md)
 - [TV2: trạng thái công việc và bằng chứng](docs/evidence/TV2-status.md)
+- [TV2: nhật ký phiên deploy baseline 06/11](docs/evidence/TV2-baseline-20261106.md)
 - [TV3: hướng dẫn laptop, công cụ và thực hiện trên cloud](docs/tv3-runbook.md)
 - [TV3: quyền truy cập, đầu vào và bàn giao cho nhóm](docs/tv3-handover.md)
 - [TV3: ma trận kiểm thử và bằng chứng](docs/tv3-test-matrix.md)
