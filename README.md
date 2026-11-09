@@ -26,6 +26,8 @@ Repository đã có Terraform tạo ba VM, script bootstrap kubeadm/Calico, Helm
 
 **Tiến độ đối chiếu ngày 07/11/2026:** TV2 đã deploy baseline và ghi kết quả kỹ thuật APP01/SVC01–03 trong [nhật ký 06/11](docs/evidence/TV2-baseline-20261106.md), đưa lên GitHub tại `8260fc9`. Sau đó TV3 đã cài Istio/Prometheus/Kiali, bật injection/route, thử NodePort hai worker, policy và Service cùng các lượt phục hồi; xem [TV3-status](docs/evidence/TV3-status.md). Còn chờ kiểm tra chéo độc lập của các thành viên, viewer và frontend LB. Nhật ký baseline là lịch sử trước mesh; không apply lại namespace injection disabled hoặc dựng lại cụm đang có. Cả ba VM đã được xác nhận TERMINATED lúc 00:06:38 ngày 07/11 trong bằng chứng TV3.
 
+**Phiên mesh TV2 10/11/2026:** trên cụm đã tích hợp, TV2 tự chạy APP01 qua gateway (HTTP 200, 9 sao) và luật phân quyền — SEC01 mTLS STRICT (hai nguồn 200) rồi SEC02 AuthorizationPolicy (reviews 200 / productpage 403, có log RBAC `rbac_access_denied`), sau đó gỡ luật phục hồi baseline và tắt VM. Nhật ký: [TV2-mesh-20261110](docs/evidence/TV2-mesh-20261110.md). Lượt mang tên TV2, vẫn chờ TV1/TV3 kiểm tra chéo và NodePort→LB.
+
 **Bắt đầu tại [hướng dẫn triển khai cloud](docs/deploy-cloud.md)**: có từng lệnh chạy tại Cloud Shell, VM và Windows, kiểm tra sau mỗi giai đoạn, lịch năm ngày và cách dọn tài nguyên. Đây là nguồn hướng dẫn thao tác cho bộ config hiện tại; không chạy xen kẽ lệnh tạo hạ tầng trong tài liệu cũ.
 
 Phiên bản được ghim tại `config/versions.env`. Điền project trong `infra/gcp/terraform.tfvars` (không commit), dùng Terraform plan trước apply. Cấu hình mặc định là ba VM 2 vCPU/8 GiB, tổng boot disk 110 GB, truy cập dashboard qua IAP/SSH; public LB tùy chọn. Laptop không cần máy ảo.
@@ -44,6 +46,7 @@ Phần Bookinfo chuẩn bị trên laptop ngày 06/11 có source upstream kèm h
 - [TV2: ứng dụng Bookinfo — nguồn, giấy phép và bảng kê Service](apps/bookinfo/README.md)
 - [TV2: trạng thái công việc và bằng chứng](docs/evidence/TV2-status.md)
 - [TV2: nhật ký phiên deploy baseline 06/11](docs/evidence/TV2-baseline-20261106.md)
+- [TV2: nhật ký phiên mesh APP01/SEC01/SEC02 10/11](docs/evidence/TV2-mesh-20261110.md)
 - [TV3: hướng dẫn laptop, công cụ và thực hiện trên cloud](docs/tv3-runbook.md)
 - [TV3: quyền truy cập, đầu vào và bàn giao cho nhóm](docs/tv3-handover.md)
 - [TV3: ma trận kiểm thử và bằng chứng](docs/tv3-test-matrix.md)
