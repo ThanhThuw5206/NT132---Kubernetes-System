@@ -36,7 +36,7 @@ gcloud config set project "$PROJECT_ID"
 gcloud auth list
 gcloud projects describe "$PROJECT_ID" --format='value(projectId)'
 terraform version
-git clone --branch tv1/cloud-config https://github.com/ThanhThuw5206/NT132---Kubernetes-System.git
+git clone --branch main https://github.com/ThanhThuw5206/NT132---Kubernetes-System.git
 cd NT132---Kubernetes-System
 git rev-parse HEAD
 ```

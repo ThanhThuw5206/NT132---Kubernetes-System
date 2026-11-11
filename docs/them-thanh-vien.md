@@ -51,7 +51,7 @@ Sau khi chấp nhận, mỗi người clone và tạo branch riêng từ bản c
 git clone https://github.com/ThanhThuw5206/NT132---Kubernetes-System.git
 cd NT132---Kubernetes-System
 git fetch origin
-git switch --create tv2/application-service origin/tv1/cloud-config
+git switch --create tv2/application-service origin/main
 ```
 
 ### TV3
@@ -60,10 +60,10 @@ git switch --create tv2/application-service origin/tv1/cloud-config
 git clone https://github.com/ThanhThuw5206/NT132---Kubernetes-System.git
 cd NT132---Kubernetes-System
 git fetch origin
-git switch --create tv3/istio-network origin/tv1/cloud-config
+git switch --create tv3/istio-network origin/main
 ```
 
-Mỗi người chỉ push branch của mình và tạo pull request về `tv1/cloud-config`. Không push trực tiếp lên branch TV1, không commit Secret, kubeconfig, private key, Terraform state hoặc file `config/application.json`.
+Mỗi người chỉ push branch của mình và tạo pull request về `main`. Không push trực tiếp lên `main`, không commit Secret, kubeconfig, private key, Terraform state hoặc file `config/application.json`.
 
 ## 4. Cấp Google Cloud IAM để SSH bằng IAP
 

@@ -41,7 +41,7 @@ Thông số ứng dụng nhập qua `config/application.json` theo file example.
 
 ## Làm việc với Git
 
-Branch khởi tạo là `tv1/project-setup`. Mỗi thành viên tạo branch riêng từ commit nhóm thống nhất, ví dụ `tv2/kubernetes-service` hoặc `tv3/istio-network`.
+Branch tích hợp và branch mặc định của nhóm là `main`. Mỗi thành viên cập nhật `main`, tạo branch riêng cho phần việc của mình, ví dụ `tv2/kubernetes-service` hoặc `tv3/istio-network`, rồi mở pull request về `main`. Không push trực tiếp lên `main`.
 
 Trước khi commit, xem `git diff --cached` để kiểm tra đúng file. Giữ kubeconfig, token, private key và dữ liệu Secret ngoài Git. Chỉ đưa manifest mẫu có placeholder và chứng chỉ công khai đã kiểm tra vào repo.
 
