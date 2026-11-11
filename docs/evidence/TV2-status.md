@@ -8,6 +8,8 @@ Theo ghi nhận TV1 05/11, ba node v1.35.10 Ready, Pod IP/ClusterIP/DNS 200, Ran
 
 **Sau phiên TV3 tối 06/11–đầu 07/11:** Istio/gateway và Prometheus/Kiali đã được cài, Bookinfo đã có proxy/route; TV3 có kết quả kỹ thuật NodePort hai worker, C0–C4/C1b, SVC01–04 và phục hồi tại [TV3-status](TV3-status.md). SVC02/SVC03 của TV3 là một lượt kỹ thuật sau đó, với Pod/UID khác; không ghi thay thành TV2 đã chạy mesh hoặc đã có nghiệm thu chéo chính thức. Cả ba VM được xác nhận TERMINATED lúc 00:06:38 ngày 07/11. Khi mở lab, giữ trạng thái đã tích hợp, không apply lại namespace baseline injection disabled.
 
+**Phiên mesh TV2 09–10/11/2026:** TV2 tự bật cụm (có quyền start/stop), vào cụm đã tích hợp (pod 2/2, gateway/route sẵn, không policy), và tự chạy **APP01 qua gateway + C1 + SEC01 (STRICT) + SEC02 (200/403, có log RBAC) + phục hồi**, rồi gỡ luật về baseline và tắt VM. Nhật ký/số liệu: [TV2-mesh-20261110.md](TV2-mesh-20261110.md). Đây là lượt mesh mang tên TV2; vẫn chờ TV1/TV3 kiểm tra chéo để ký nhận.
+
 ## Đã chuẩn bị local
 
 | Sản phẩm | Tình trạng / nơi nhận |
@@ -32,8 +34,8 @@ Kết quả checker gần nhất do TV3 ghi tại [TV3-status](TV3-status.md). U
 | SVC01 | ✅ TV2 (chờ TV1 chạy lại) | selector/port/EndpointSlice khớp Pod ratings |
 | SVC02 | Kỹ thuật TV2 và lượt TV3 sau đó đã có kết quả | TV2: UID 13fff955→6004ecf3, ClusterIP giữ, web vẫn sao; lượt TV3 và rollback ghi riêng. Chờ ký nhận kiểm tra chéo |
 | SVC03 | Kỹ thuật TV2 và lượt TV3 sau đó đã có kết quả | TV2: scale 1→2→1, 2 endpoint ở 2 worker; TV3 đã đối chiếu đủ tập UID endpoint/Pod trong lượt riêng. Chờ ký nhận kiểm tra chéo |
-| Injection/route/APP01 qua gateway | TV3 đã kiểm tra kỹ thuật | App/proxy Ready, gateway trả HTTP 200 và 9 sao; TV2 cần đọc bàn giao và chạy lại |
-| SEC01/SEC02 | TV3 đã kiểm tra kỹ thuật C1/C2 | Có metric mTLS, hai nguồn 200/403, đối chứng path và phục hồi; TV2 chưa ghi một lượt mesh riêng |
+| Injection/route/APP01 qua gateway | ✅ TV2 10/11 | port-forward istio-ingressgateway → HTTP 200, 9 sao; nhật ký [TV2-mesh-20261110](TV2-mesh-20261110.md) |
+| SEC01/SEC02 | ✅ TV2 10/11 (chờ kiểm tra chéo) | C1 2 nguồn 200; SEC01 STRICT 200/200; SEC02 reviews 200 / productpage 403 + log RBAC; gỡ luật phục hồi baseline |
 | NodePort → TV1 | TV3 đã thử hai worker | Cả hai URL nội bộ port 30080 trả HTTP 200; PUB01 vẫn chờ TV1 bàn giao LB/health/firewall |
 | Phiếu app → TV3 | Dữ liệu thực đã có, còn xác nhận bàn giao | Đối chiếu [inventory](../../apps/bookinfo/service-inventory.md) và [application-handover](../application-handover.md); OBS01/SEC03/SVC04 đã có lượt TV3 |
 
