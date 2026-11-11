@@ -1,0 +1,39 @@
+{
+  "format": "nt132-bookinfo-source-v1",
+  "istio_version": "1.30.7",
+  "license": "Apache-2.0",
+  "files": {
+    "manifest_yaml": {
+      "path": "upstream/bookinfo.yaml",
+      "sha256": "ec82aaf76a031b83b26126da65e04e56c5791f0825ee2382d5c05801d4406bc5",
+      "url": "https://raw.githubusercontent.com/istio/istio/1.30.7/samples/bookinfo/platform/kube/bookinfo.yaml"
+    },
+    "manifest_json": {
+      "path": "upstream/bookinfo.list.json",
+      "sha256": "18defac571ca71d0191d346ab93201acfcc17a03edac96ed2c0f43e452625b74",
+      "derived_from": "upstream/bookinfo.yaml"
+    },
+    "license": {
+      "path": "upstream/LICENSE",
+      "sha256": "9fa6e54dafda853bb3cdc01486b677a55102f0d488282a85ba6e426d9125f8c5",
+      "url": "https://raw.githubusercontent.com/istio/istio/1.30.7/LICENSE"
+    }
+  },
+  "conversion": {
+    "method": "safe parser: nonempty YAML documents, unchanged objects wrapped in Kubernetes v1/List",
+    "parser": "ruamel.yaml 0.15.93",
+    "verified_structural_equality": true,
+    "runtime_dependency": "Python standard library only; vendored JSON avoids a YAML parser at runtime"
+  },
+  "health_sources": {
+    "details": "https://raw.githubusercontent.com/istio/istio/1.30.7/samples/bookinfo/src/details/details.rb",
+    "ratings": "https://raw.githubusercontent.com/istio/istio/1.30.7/samples/bookinfo/src/ratings/ratings.js",
+    "reviews": "https://raw.githubusercontent.com/istio/istio/1.30.7/samples/bookinfo/src/reviews/reviews-application/src/main/java/application/rest/LibertyRestEndpoint.java",
+    "productpage": "https://raw.githubusercontent.com/istio/istio/1.30.7/samples/bookinfo/src/productpage/productpage.py"
+  },
+  "notes": [
+    "Hashes bind the reviewed source artifacts; they do not independently authenticate upstream authorship.",
+    "Image tags are from the pinned upstream manifest. Runtime imageID/digest must be recorded after deployment.",
+    "The generated overlay is a local design; probe success and resource fit require cluster acceptance."
+  ]
+}

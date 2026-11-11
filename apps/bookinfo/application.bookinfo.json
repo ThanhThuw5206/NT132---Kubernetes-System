@@ -1,0 +1,24 @@
+{
+  "namespace": "bookinfo",
+  "entry_service": "productpage",
+  "entry_service_port": 9080,
+  "public_path_prefix": "/productpage",
+  "public_http_matches": [
+    {"exact": "/productpage"},
+    {"prefix": "/static/"},
+    {"exact": "/login"},
+    {"exact": "/logout"},
+    {"exact": "/api/v1/products"},
+    {"prefix": "/api/v1/products/"}
+  ],
+  "target_service": "ratings",
+  "target_service_port": 9080,
+  "target_port": 9080,
+  "target_labels": {"app": "ratings"},
+  "allowed_caller_labels": {"app": "reviews"},
+  "allowed_service_account": "bookinfo-reviews",
+  "trust_domain": "cluster.local",
+  "allowed_http_methods": ["GET"],
+  "allowed_http_paths": ["/ratings/0"],
+  "permit_prometheus_scrape": true
+}

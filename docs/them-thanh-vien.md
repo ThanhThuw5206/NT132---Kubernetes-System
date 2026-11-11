@@ -169,7 +169,7 @@ TV1 không cần viết lại cụm. Các việc còn lại:
 
 ## 7. Công việc TV2 — ứng dụng và Kubernetes Service
 
-TV2 không dùng Bookinfo hoặc ứng dụng mẫu do TV1 chọn thay. TV2 tự chọn workload có ít nhất hai thành phần giao tiếp qua HTTP để chứng minh Service.
+TV2 tự chọn workload có ít nhất hai thành phần giao tiếp qua HTTP để chứng minh Service. Ngày 06/11 đã nhận lựa chọn **Bookinfo do TV2 chốt** tại `4377766`; xem [runbook TV2](tv2-runbook.md) cho source có hash/license và baseline không injection trước tích hợp mesh. Đây là cập nhật lựa chọn ứng dụng, chưa phải kết quả triển khai cloud.
 
 ### Phần code/config phải làm
 

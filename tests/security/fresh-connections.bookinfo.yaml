@@ -1,0 +1,15 @@
+# Temporary test condition, created before C0 and removed after recovery.
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: tv3-test-fresh-ratings-connections
+  namespace: bookinfo
+spec:
+  host: ratings.bookinfo.svc.cluster.local
+  trafficPolicy:
+    connectionPool:
+      tcp:
+        maxConnectionDuration: 1s
+      http:
+        maxRequestsPerConnection: 1
+        idleTimeout: 1s
